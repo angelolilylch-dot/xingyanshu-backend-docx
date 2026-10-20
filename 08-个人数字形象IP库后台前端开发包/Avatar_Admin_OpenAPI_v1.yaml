@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: 星衍树个人数字形象管理后台 API
+  version: 1.0.0
+  description: |
+    仅供既有管理后台使用。统一响应外层为 code、message、data、requestId、timestamp；所有 ID 一律按字符串处理。
+    基础路径为 /api/v1。MENU_AVATAR_MANAGEMENT 只控制一级菜单可见性，操作还必须以 AVATAR_* 权限为准。
+servers:
+  - url: /api/v1
+security: [{AdminBearer: []}]
+paths:
+  /avatar/rosters/template:
+    get: {tags: [名单], summary: 下载当前可联调三列模板, responses: {'200': {description: xlsx 文件}}}
+  /avatar/roster-batches/import:
+    post:
+      tags: [名单]
+      summary: 导入名单（当前仅姓名、手机号、性别）
+      requestBody: {required: true, content: {multipart/form-data: {schema: {$ref: '#/components/schemas/RosterImport'}}}}
+      responses: {'201': {$ref: '#/components/responses/Envelope'}}
+  /avatar/roster-batches:
+    get: {tags: [名单], summary: 查询导入批次, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/roster-batches/{id}:
+    get: {tags: [名单], summary: 查询导入批次详情, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/roster-batches/{id}/errors:
+    get: {tags: [名单], summary: 下载错误回执, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {description: xlsx 文件}}}
+  /avatar/roster-members:
+    get: {tags: [名单], summary: 查询本城市脱敏名单与建档状态, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/profiles:
+    get: {tags: [档案], summary: 查询本城市脱敏档案进度, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/roster-members/{id}/sms-notifications:
+    post: {tags: [建档提醒], summary: 发送建档提醒, parameters: [{$ref: '#/components/parameters/Id'}], requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Notification'}}}}, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/city-registration-config:
+    put: {tags: [建档入口], summary: 保存城市联系人, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CityConfig'}}}}, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/registration-qrcodes:
+    get: {tags: [建档入口], summary: 查询二维码, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+    post: {tags: [建档入口], summary: 创建二维码, responses: {'201': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/registration-qrcodes/{id}/pause:
+    post: {tags: [建档入口], summary: 暂停二维码, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/registration-qrcodes/{id}/resume:
+    post: {tags: [建档入口], summary: 恢复二维码, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/quality-reviews/pending:
+    get: {tags: [人工质检], summary: 查询待办, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/collection-sessions/{id}/quality-reviews:
+    post: {tags: [人工质检], summary: 加入人工质检, parameters: [{$ref: '#/components/parameters/Id'}], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/QualityQueue'}}}}, responses: {'201': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/quality-reviews/{id}/previews:
+    post: {tags: [人工质检], summary: 申请一次性素材预览令牌, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/quality-previews/{token}:
+    get: {tags: [人工质检], summary: 消费一次性预览令牌, parameters: [{name: token, in: path, required: true, schema: {type: string}}], responses: {'200': {description: 预览流}}}
+  /avatar/quality-reviews/{id}/decision:
+    post: {tags: [人工质检], summary: 提交质检决定, parameters: [{$ref: '#/components/parameters/Id'}], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/QualityDecision'}}}}, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/deletion-requests:
+    get: {tags: [删除审批], summary: 查询删除申请, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/deletion-requests/{id}/decision:
+    post: {tags: [删除审批], summary: 提交删除审批, parameters: [{$ref: '#/components/parameters/Id'}], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DeletionDecision'}}}}, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/exports:
+    get: {tags: [导出], summary: 查询导出任务, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+    post: {tags: [导出], summary: 创建导出任务, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ExportRequest'}}}}, responses: {'201': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/exports/{id}:
+    get: {tags: [导出], summary: 查询导出任务详情, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/exports/{id}/download:
+    post: {tags: [导出], summary: 申请一次性下载动作, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/exports/{id}/password/reveal:
+    post: {tags: [导出], summary: 仅归档包显示一次密码, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/exports/{id}/regenerate:
+    post: {tags: [导出], summary: 重生成归档包及其密码, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'202': {$ref: '#/components/responses/Envelope'}}}
+components:
+  securitySchemes: {AdminBearer: {type: http, scheme: bearer, bearerFormat: JWT}}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string}, description: 64 位业务 ID，按字符串处理}
+  responses:
+    Envelope: {description: 统一成功或业务错误响应, content: {application/json: {schema: {$ref: '#/components/schemas/Envelope'}}}}
+  schemas:
+    Envelope: {type: object, required: [code, message, requestId, timestamp], properties: {code: {type: string}, message: {type: string}, data: {type: object, additionalProperties: true}, requestId: {type: string}, timestamp: {type: string, format: date-time}}}
+    RosterImport: {type: object, required: [file], properties: {file: {type: string, format: binary, description: 当前仅接受表头 姓名、手机号、性别 的 xlsx}}}
+    CityConfig: {type: object, required: [supportContactName, supportContactPhone], properties: {supportContactName: {type: string}, supportContactPhone: {type: string}}}
+    Notification: {type: object, properties: {templateCode: {type: string}}}
+    QualityQueue: {type: object, required: [reviewType, reasonCode], properties: {reviewType: {type: string, enum: [SAMPLE, RISK]}, reasonCode: {type: string}, reason: {type: string}}}
+    QualityDecision: {type: object, required: [version, decision], properties: {version: {type: integer}, decision: {type: string, enum: [PASSED, REJECTED, RESHOOT_REQUIRED]}, reasonCode: {type: string}, reason: {type: string}}}
+    DeletionDecision: {type: object, required: [decision], properties: {decision: {type: string, enum: [APPROVED, REJECTED, RETENTION_EXCEPTION]}, retentionExceptionCode: {type: string}, reason: {type: string}}}
+    ExportRequest: {type: object, required: [exportType], properties: {exportType: {type: string, enum: [PROGRESS_LIST, ARCHIVE_PACKAGE]}, cityOrgId: {type: string}, purposeCode: {type: string}, profileIds: {type: array, items: {type: string}}}}

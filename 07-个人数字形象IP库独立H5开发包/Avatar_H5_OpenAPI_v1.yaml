@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: 星衍树个人数字形象 IP 库 - 独立 H5 API
+  version: v1.0
+  description: 测试联调契约。所有响应使用 code/message/data/requestId/timestamp 外层；Mock 端点只在 test 环境注册。
+servers:
+  - url: /api/v1
+tags:
+  - name: AVATAR_H5
+paths:
+  /avatar/public/registration-context:
+    get:
+      tags: [AVATAR_H5]
+      security: []
+      parameters: [{name: code, in: query, required: true, schema: {type: string}}]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/auth/sms/send:
+    post:
+      tags: [AVATAR_H5]
+      security: []
+      requestBody: {$ref: '#/components/requestBodies/Sms'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/auth/login:
+    post:
+      tags: [AVATAR_H5]
+      security: []
+      requestBody: {$ref: '#/components/requestBodies/Login'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/auth/refresh:
+    post:
+      tags: [AVATAR_H5]
+      security: []
+      requestBody: {$ref: '#/components/requestBodies/Refresh'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/auth/logout:
+    post:
+      tags: [AVATAR_H5]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/identity-verifications:
+    post:
+      tags: [AVATAR_H5]
+      requestBody: {$ref: '#/components/requestBodies/MockIdentityStart'}
+      responses: {'201': {$ref: '#/components/responses/Ok'}}
+  /avatar/identity-verifications/latest:
+    get:
+      tags: [AVATAR_H5]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/test/identity-verifications/{id}/complete:
+    post:
+      tags: [AVATAR_H5]
+      description: 仅 test 环境注册。
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/MockIdentityComplete'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/roster-binding/confirm:
+    post:
+      tags: [AVATAR_H5]
+      requestBody: {$ref: '#/components/requestBodies/Binding'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/consents/current:
+    get:
+      tags: [AVATAR_H5]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/consents:
+    post:
+      tags: [AVATAR_H5]
+      requestBody: {$ref: '#/components/requestBodies/Consent'}
+      responses: {'201': {$ref: '#/components/responses/Ok'}}
+  /avatar/collection-sessions:
+    post:
+      tags: [AVATAR_H5]
+      responses: {'201': {$ref: '#/components/responses/Ok'}}
+  /avatar/collection-sessions/{id}/assets/upload-credentials:
+    post:
+      tags: [AVATAR_H5]
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/UploadCredential'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/collection-sessions/{id}/assets/confirm:
+    post:
+      tags: [AVATAR_H5]
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/AssetConfirm'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/collection-sessions/{id}/body-data:
+    patch:
+      tags: [AVATAR_H5]
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/BodyData'}
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/collection-sessions/{id}/submit:
+    post:
+      tags: [AVATAR_H5]
+      description: 当前实际接口无请求体。
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/profiles/me:
+    get:
+      tags: [AVATAR_H5]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+  /avatar/profiles/me/reshoot:
+    post:
+      tags: [AVATAR_H5]
+      requestBody: {$ref: '#/components/requestBodies/Reason'}
+      responses: {'201': {$ref: '#/components/responses/Ok'}}
+  /avatar/profiles/me/deletion-requests:
+    post:
+      tags: [AVATAR_H5]
+      requestBody: {$ref: '#/components/requestBodies/Reason'}
+      responses: {'201': {$ref: '#/components/responses/Ok'}}
+  /avatar/profiles/me/deletion-requests/latest:
+    get:
+      tags: [AVATAR_H5]
+      responses: {'200': {$ref: '#/components/responses/Ok'}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: AVATAR_H5 JWT}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string}}
+  responses:
+    Ok: {description: 统一业务响应}
+  requestBodies:
+    Sms: {required: true, content: {application/json: {schema: {type: object, required: [mobile, scene], properties: {mobile: {type: string}, scene: {type: string, enum: [AVATAR_LOGIN]}}}}}}
+    Login: {required: true, content: {application/json: {schema: {type: object, required: [mobile, smsCode], properties: {mobile: {type: string}, smsCode: {type: string}}}}}}
+    Refresh: {required: true, content: {application/json: {schema: {type: object, required: [refreshToken], properties: {refreshToken: {type: string}}}}}}
+    MockIdentityStart: {required: true, content: {application/json: {schema: {type: object, required: [verificationMethod], properties: {verificationMethod: {type: string, enum: [MOCK]}}}}}}
+    MockIdentityComplete: {required: true, content: {application/json: {schema: {type: object, required: [name, gender], properties: {name: {type: string}, gender: {type: string, enum: [MALE, FEMALE]}, idNumberLast4: {type: string, maxLength: 4}}}}}}
+    Binding: {required: true, content: {application/json: {schema: {type: object, required: [registrationCode], properties: {registrationCode: {type: string}}}}}}
+    Consent: {required: true, content: {application/json: {schema: {type: object, required: [consentType, agreementVersion, accepted], properties: {consentType: {type: string, enum: [COLLECT_AND_ARCHIVE]}, agreementVersion: {type: string}, accepted: {type: boolean, enum: [true]}}}}}}
+    UploadCredential: {required: true, content: {application/json: {schema: {type: object, required: [assetType, captureSlot, contentHash, mimeType, fileSize], properties: {assetType: {type: string}, captureSlot: {type: string}, contentHash: {type: string, minLength: 64, maxLength: 64}, mimeType: {type: string}, fileSize: {type: integer, minimum: 1}}}}}}
+    AssetConfirm: {required: true, content: {application/json: {schema: {type: object, required: [uploadToken, contentHash], properties: {uploadToken: {type: string}, contentHash: {type: string}}}}}}
+    BodyData: {required: true, content: {application/json: {schema: {type: object, required: [gender, heightCm, bodyType], properties: {gender: {type: string}, heightCm: {type: number}, bodyType: {type: string}, bustCm: {type: number}, waistCm: {type: number}, hipsCm: {type: number}}}}}}
+    Reason: {required: false, content: {application/json: {schema: {type: object, properties: {reason: {type: string}}}}}}

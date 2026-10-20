@@ -1,0 +1,9 @@
+# 本地依赖、构建脚本检查与预览产物不属于前端 AI 交付包
+**/node_modules/
+**/*.inspect.ndjson
+**/*_预览.png
+**/生成_*.mjs
+
+# 系统文件
+Thumbs.db
+Desktop.ini
