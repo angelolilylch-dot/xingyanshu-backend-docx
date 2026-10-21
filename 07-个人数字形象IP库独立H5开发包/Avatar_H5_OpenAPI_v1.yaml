@@ -83,6 +83,14 @@ paths:
       parameters: [{$ref: '#/components/parameters/Id'}]
       requestBody: {$ref: '#/components/requestBodies/AssetConfirm'}
       responses: {'200': {$ref: '#/components/responses/AssetConfirmOk'}, '400': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
+  /avatar/collection-sessions/{id}/assets/cancel:
+    post:
+      tags: [AVATAR_H5]
+      summary: 取消未确认上传并立即释放并发名额
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/UploadCancel'}
+      responses: {'200': {$ref: '#/components/responses/UploadCancelOk'}, '400': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/body-data:
     patch:
       tags: [AVATAR_H5]
@@ -134,6 +142,7 @@ components:
     CollectionOk: {description: "采集会话", content: {application/json: {schema: {$ref: '#/components/schemas/CollectionEnvelope'}}}}
     UploadCredentialOk: {description: "上传凭证", content: {application/json: {schema: {$ref: '#/components/schemas/UploadCredentialEnvelope'}}}}
     AssetConfirmOk: {description: "素材确认", content: {application/json: {schema: {$ref: '#/components/schemas/AssetConfirmEnvelope'}}}}
+    UploadCancelOk: {description: "上传取消", content: {application/json: {schema: {$ref: '#/components/schemas/UploadCancelEnvelope'}}}}
     BodyDataOk: {description: "体型资料保存", content: {application/json: {schema: {$ref: '#/components/schemas/BodyDataEnvelope'}}}}
     SubmitOk: {description: "提交采集", content: {application/json: {schema: {$ref: '#/components/schemas/SubmitEnvelope'}}}}
     ProfileOk: {description: "本人档案", content: {application/json: {schema: {$ref: '#/components/schemas/ProfileEnvelope'}}}}
@@ -163,6 +172,7 @@ components:
     CollectionEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [sessionId, status, photoRequiredCount, videoRequired, requiredSlots, resumed], properties: {sessionId: {type: string}, status: {type: string, enum: [DRAFT, COLLECTING]}, photoRequiredCount: {type: integer, enum: [8]}, videoRequired: {type: boolean, enum: [true]}, requiredSlots: {type: array, minItems: 9, maxItems: 9, items: {$ref: '#/components/schemas/CaptureSlot'}}, resumed: {type: boolean}, reshoot: {type: boolean}}}}}]}
     UploadCredentialEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [uploadToken, uploadURL, expiresIn, method, headers], properties: {uploadToken: {type: string}, uploadURL: {type: string, format: uri}, expiresIn: {type: integer, enum: [600]}, method: {type: string, enum: [PUT]}, headers: {type: object, required: [Content-Type], properties: {Content-Type: {type: string}}}}}}}]}
     AssetConfirmEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [assetId, captureSlot, status], properties: {assetId: {type: string}, captureSlot: {type: string, enum: [FACE_01, FACE_02, FACE_03, FACE_04, FACE_05, FACE_06, FACE_07, FACE_08, VOICE_VIDEO]}, status: {type: string, enum: [CONFIRMED]}}}}}]}
+    UploadCancelEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [uploadToken, status], properties: {uploadToken: {type: string}, status: {type: string, enum: [CANCELLED]}}}}}]}
     BodyDataEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [sessionId, status], properties: {sessionId: {type: string}, status: {type: string, enum: [SAVED]}}}}}]}
     SubmitEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [status, processingTaskId], properties: {status: {type: string, enum: [AUTO_QUALITY_CHECKING]}, processingTaskId: {type: string}}}}}]}
     ProfileEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [profileId, profileNo, version, status, realNameStatus, collectionStatus, qualityStatus, archiveStatus, latestSessionId, summary, canRequestDeletion], properties: {profileId: {type: string}, profileNo: {type: string}, version: {type: integer}, status: {type: string, enum: [NOT_STARTED, CONSENT_PENDING, COLLECTING, AUTO_QUALITY_CHECKING, MANUAL_REVIEW, ARCHIVED, RESHOOT_REQUIRED, REJECTED, DELETION_REQUESTED, DELETION_PROCESSING, DELETED]}, realNameStatus: {type: string, enum: [PENDING, PASSED, REJECTED]}, collectionStatus: {type: string, enum: [NOT_STARTED, COLLECTING, SUBMITTED, PASSED, REJECTED]}, qualityStatus: {type: string, enum: [NOT_STARTED, PENDING, PASSED, REJECTED, MANUAL_REVIEW]}, archiveStatus: {type: string, enum: [NOT_STARTED, ARCHIVED, DELETED]}, archivedAt: {type: string, format: date-time, nullable: true}, retentionUntil: {type: string, format: date-time, nullable: true}, latestSessionId: {type: string}, submittedAt: {type: string, format: date-time, nullable: true}, summary: {type: object, required: [photoCount, videoCount, bodyDataFilled], properties: {photoCount: {type: integer}, videoCount: {type: integer}, bodyDataFilled: {type: boolean}}}, canRequestDeletion: {type: boolean}}}}}]}
@@ -194,5 +204,6 @@ components:
     Consent: {required: true, content: {application/json: {schema: {type: object, required: [consentType, agreementVersion, accepted], properties: {consentType: {type: string, enum: [COLLECT_AND_ARCHIVE]}, agreementVersion: {type: string}, accepted: {type: boolean, enum: [true]}}}}}}
     UploadCredential: {required: true, content: {application/json: {schema: {type: object, required: [assetType, captureSlot, contentHash, mimeType, fileSize], properties: {assetType: {type: string, enum: [FACE_PHOTO, VOICE_VIDEO]}, captureSlot: {type: string, description: FACE_01 至 FACE_08，或 VOICE_VIDEO}, contentHash: {type: string, minLength: 64, maxLength: 64, description: 文件原始字节 SHA-256 小写十六进制}, mimeType: {type: string}, fileSize: {type: integer, minimum: 1, maximum: 209715200}}}}}}
     AssetConfirm: {required: true, content: {application/json: {schema: {type: object, required: [uploadToken, contentHash], properties: {uploadToken: {type: string}, contentHash: {type: string}}}}}}
+    UploadCancel: {required: true, content: {application/json: {schema: {type: object, required: [uploadToken], properties: {uploadToken: {type: string}}}}}}
     BodyData: {description: 整个 body-data 动作为可选；一旦调用则 gender/heightCm/bodyType 必填，bodyType 当前为非空自由字符串，三围可独立省略。height 与三围单位均为 cm。 , required: true, content: {application/json: {schema: {type: object, required: [gender, heightCm, bodyType], properties: {gender: {type: string, enum: [MALE, FEMALE]}, heightCm: {type: number, exclusiveMinimum: 0, maximum: 300}, bodyType: {type: string, minLength: 1, description: 当前无服务端枚举约束}, bustCm: {type: number, exclusiveMinimum: 0, maximum: 300}, waistCm: {type: number, exclusiveMinimum: 0, maximum: 300}, hipsCm: {type: number, exclusiveMinimum: 0, maximum: 300}}}}}}
     Reason: {required: false, content: {application/json: {schema: {type: object, properties: {reason: {type: string}}}}}}
