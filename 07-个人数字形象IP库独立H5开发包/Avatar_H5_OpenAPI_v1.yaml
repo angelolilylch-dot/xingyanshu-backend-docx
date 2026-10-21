@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: 星衍树个人数字形象 IP 库 - 独立 H5 API
-  version: v1.0
-  description: 测试联调契约。所有响应使用 code/message/data/requestId/timestamp 外层；Mock 端点只在 test 环境注册。
+  version: v1.2
+  description: "以当前后端代码为准的联调契约。所有响应使用 code/message/data/requestId/timestamp 外层，成功 code 为字符串 OK；所有写接口必须带 Idempotency-Key（16-128 位），重放返回 Idempotency-Replayed: true，同键不同请求体返回 409 IDEMPOTENCY_CONFLICT。Mock 端点只在 test 环境注册。名单在后台导入时完成 Mock 实名核验，H5 以姓名、已短信验证手机号、性别绑定。"
 servers:
   - url: /api/v1
 tags:
@@ -13,121 +13,186 @@ paths:
       tags: [AVATAR_H5]
       security: []
       parameters: [{name: code, in: query, required: true, schema: {type: string}}]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/RegistrationContextOk'}, '422': {$ref: '#/components/responses/Error'}}
   /avatar/auth/sms/send:
     post:
       tags: [AVATAR_H5]
       security: []
       requestBody: {$ref: '#/components/requestBodies/Sms'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/SmsOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '429': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
   /avatar/auth/login:
     post:
       tags: [AVATAR_H5]
       security: []
       requestBody: {$ref: '#/components/requestBodies/Login'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/AuthOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}}
   /avatar/auth/refresh:
     post:
       tags: [AVATAR_H5]
       security: []
       requestBody: {$ref: '#/components/requestBodies/Refresh'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/AuthOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '401': {$ref: '#/components/responses/Error'}}
   /avatar/auth/logout:
     post:
       tags: [AVATAR_H5]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/EmptyOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
   /avatar/identity-verifications:
     post:
       tags: [AVATAR_H5]
       requestBody: {$ref: '#/components/requestBodies/MockIdentityStart'}
-      responses: {'201': {$ref: '#/components/responses/Ok'}}
+      responses: {'201': {$ref: '#/components/responses/IdentityOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
   /avatar/identity-verifications/latest:
     get:
       tags: [AVATAR_H5]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/IdentityLatestOk'}, '401': {$ref: '#/components/responses/Error'}}
   /avatar/test/identity-verifications/{id}/complete:
     post:
       tags: [AVATAR_H5]
       description: 仅 test 环境注册。
       parameters: [{$ref: '#/components/parameters/Id'}]
       requestBody: {$ref: '#/components/requestBodies/MockIdentityComplete'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/EmptyOk'}, '400': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}}
   /avatar/roster-binding/confirm:
     post:
       tags: [AVATAR_H5]
+      description: 提交姓名、性别和二维码短码；后端以该信息及登录手机号匹配已通过后台 Mock 实名核验的名单。
       requestBody: {$ref: '#/components/requestBodies/Binding'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/BindingOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}}
   /avatar/consents/current:
     get:
       tags: [AVATAR_H5]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/ConsentCurrentOk'}, '401': {$ref: '#/components/responses/Error'}}
   /avatar/consents:
     post:
       tags: [AVATAR_H5]
       requestBody: {$ref: '#/components/requestBodies/Consent'}
-      responses: {'201': {$ref: '#/components/responses/Ok'}}
+      responses: {'201': {$ref: '#/components/responses/ConsentAcceptOk'}, '400': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions:
     post:
       tags: [AVATAR_H5]
-      responses: {'201': {$ref: '#/components/responses/Ok'}}
+      responses: {'201': {$ref: '#/components/responses/CollectionOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '412': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/assets/upload-credentials:
     post:
       tags: [AVATAR_H5]
       parameters: [{$ref: '#/components/parameters/Id'}]
       requestBody: {$ref: '#/components/requestBodies/UploadCredential'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/UploadCredentialOk'}, '400': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/assets/confirm:
     post:
       tags: [AVATAR_H5]
       parameters: [{$ref: '#/components/parameters/Id'}]
       requestBody: {$ref: '#/components/requestBodies/AssetConfirm'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/AssetConfirmOk'}, '400': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}, '503': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/body-data:
     patch:
       tags: [AVATAR_H5]
       parameters: [{$ref: '#/components/parameters/Id'}]
       requestBody: {$ref: '#/components/requestBodies/BodyData'}
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/BodyDataOk'}, '400': {$ref: '#/components/responses/Error'}, '401': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/submit:
     post:
       tags: [AVATAR_H5]
       description: 当前实际接口无请求体。
       parameters: [{$ref: '#/components/parameters/Id'}]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/SubmitOk'}, '400': {$ref: '#/components/responses/Error'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}}
   /avatar/profiles/me:
     get:
       tags: [AVATAR_H5]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/ProfileOk'}, '401': {$ref: '#/components/responses/Error'}, '404': {$ref: '#/components/responses/Error'}}
   /avatar/profiles/me/reshoot:
     post:
       tags: [AVATAR_H5]
       requestBody: {$ref: '#/components/requestBodies/Reason'}
-      responses: {'201': {$ref: '#/components/responses/Ok'}}
+      responses: {'201': {$ref: '#/components/responses/CollectionOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
   /avatar/profiles/me/deletion-requests:
     post:
       tags: [AVATAR_H5]
       requestBody: {$ref: '#/components/requestBodies/Reason'}
-      responses: {'201': {$ref: '#/components/responses/Ok'}}
+      responses: {'201': {$ref: '#/components/responses/DeletionOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
   /avatar/profiles/me/deletion-requests/latest:
     get:
       tags: [AVATAR_H5]
-      responses: {'200': {$ref: '#/components/responses/Ok'}}
+      responses: {'200': {$ref: '#/components/responses/DeletionLatestOk'}, '401': {$ref: '#/components/responses/Error'}}
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: AVATAR_H5 JWT}
   parameters:
     Id: {name: id, in: path, required: true, schema: {type: string}}
   responses:
-    Ok: {description: 统一业务响应}
+    Error:
+      description: 统一错误响应；稳定错误码见同目录《05-幂等与错误码契约》。
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    RegistrationContextOk: {description: "城市入口", content: {application/json: {schema: {$ref: '#/components/schemas/RegistrationContextEnvelope'}}}}
+    SmsOk: {description: "短信发送", content: {application/json: {schema: {$ref: '#/components/schemas/SmsEnvelope'}}}}
+    AuthOk: {description: "登录或刷新", content: {application/json: {schema: {$ref: '#/components/schemas/AuthEnvelope'}}}}
+    EmptyOk: {description: "成功", content: {application/json: {schema: {$ref: '#/components/schemas/EmptyEnvelope'}}}}
+    IdentityOk: {description: "创建 Mock 实名会话", content: {application/json: {schema: {$ref: '#/components/schemas/IdentityEnvelope'}}}}
+    IdentityLatestOk: {description: "最近实名会话", content: {application/json: {schema: {$ref: '#/components/schemas/IdentityLatestEnvelope'}}}}
+    BindingOk: {description: "名单绑定", content: {application/json: {schema: {$ref: '#/components/schemas/BindingEnvelope'}}}}
+    ConsentCurrentOk: {description: "当前授权或待签协议", content: {application/json: {schema: {$ref: '#/components/schemas/ConsentCurrentEnvelope'}}}}
+    ConsentAcceptOk: {description: "授权签署", content: {application/json: {schema: {$ref: '#/components/schemas/ConsentAcceptEnvelope'}}}}
+    CollectionOk: {description: "采集会话", content: {application/json: {schema: {$ref: '#/components/schemas/CollectionEnvelope'}}}}
+    UploadCredentialOk: {description: "上传凭证", content: {application/json: {schema: {$ref: '#/components/schemas/UploadCredentialEnvelope'}}}}
+    AssetConfirmOk: {description: "素材确认", content: {application/json: {schema: {$ref: '#/components/schemas/AssetConfirmEnvelope'}}}}
+    BodyDataOk: {description: "体型资料保存", content: {application/json: {schema: {$ref: '#/components/schemas/BodyDataEnvelope'}}}}
+    SubmitOk: {description: "提交采集", content: {application/json: {schema: {$ref: '#/components/schemas/SubmitEnvelope'}}}}
+    ProfileOk: {description: "本人档案", content: {application/json: {schema: {$ref: '#/components/schemas/ProfileEnvelope'}}}}
+    DeletionOk: {description: "删除申请", content: {application/json: {schema: {$ref: '#/components/schemas/DeletionEnvelope'}}}}
+    DeletionLatestOk: {description: "最近删除申请", content: {application/json: {schema: {$ref: '#/components/schemas/DeletionLatestEnvelope'}}}}
+  headers:
+    IdempotencyReplayed: {schema: {type: string, enum: ['true']}, description: 相同幂等键与请求体命中首次结果。}
+  schemas:
+    Envelope:
+      type: object
+      required: [code, message, requestId, timestamp]
+      properties: {code: {type: string, enum: [OK]}, message: {type: string}, requestId: {type: string}, timestamp: {type: string, format: date-time}}
+    ErrorEnvelope:
+      type: object
+      required: [code, message, requestId, timestamp]
+      properties: {code: {type: string}, message: {type: string}, data: {type: object, additionalProperties: true}, requestId: {type: string}, timestamp: {type: string, format: date-time}, fieldErrors: {type: array, items: {type: object, properties: {field: {type: string}, message: {type: string}}}}}
+    RegistrationContextEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [cityName, cityCode, entryStatus, retentionDays], properties: {cityName: {type: string}, cityCode: {type: string}, operatorName: {type: string}, supportPhone: {type: string}, entryStatus: {type: string, enum: [ACTIVE, PAUSED]}, available: {type: boolean}, notice: {type: string}, retentionDays: {type: integer, enum: [365]}}}}}]}
+    SmsEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [expiresIn, retryAfter], properties: {expiresIn: {type: integer, enum: [300]}, retryAfter: {type: integer, enum: [60]}, mockCode: {type: string, description: 仅 test 环境}}}}}]}
+    AuthEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [accessToken, refreshToken, expiresIn, tokenType, account], properties: {accessToken: {type: string}, refreshToken: {type: string}, expiresIn: {type: integer}, tokenType: {type: string, enum: [Bearer]}, account: {type: object, required: [id, mobileMasked, clientType], properties: {id: {type: string}, mobileMasked: {type: string}, clientType: {type: string, enum: [AVATAR_H5]}}}, registered: {type: boolean}}}}}]}
+    EmptyEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object}}}]}
+    IdentityEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [verificationId, verificationNo, status], properties: {verificationId: {type: string}, verificationNo: {type: string}, status: {type: string, enum: [PENDING]}}}}}]}
+    IdentityLatestEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [status], properties: {verificationId: {type: string}, verificationNo: {type: string}, status: {type: string, enum: [NOT_STARTED, PENDING, PASSED, REJECTED]}, verifiedAt: {type: string, format: date-time, nullable: true}}}}}]}
+    BindingEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [rosterMemberId, cityName, personType, bindingStatus], properties: {rosterMemberId: {type: string}, cityName: {type: string}, personType: {type: string, enum: [PROFESSIONAL_MODEL]}, bindingStatus: {type: string, enum: [BOUND]}}}}}]}
+    ConsentCurrentEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [status, consentType, agreementVersion, agreementContent, retentionDays], properties: {status: {type: string, enum: [REQUIRED, ACTIVE]}, consentId: {type: string}, consentType: {type: string, enum: [COLLECT_AND_ARCHIVE]}, agreementVersion: {type: string}, agreementContent: {type: string}, retentionDays: {type: integer, enum: [365]}, retentionUntil: {type: string, format: date-time, nullable: true}, purpose: {type: string}}}}}]}
+    ConsentAcceptEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [consentId, status, retentionDays], properties: {consentId: {type: string}, status: {type: string, enum: [ACTIVE]}, retentionDays: {type: integer, enum: [365]}}}}}]}
+    CaptureSlot: {type: object, required: [captureSlot, assetType, label, required, maxFileSize, mimeTypes], properties: {captureSlot: {type: string, enum: [FACE_01, FACE_02, FACE_03, FACE_04, FACE_05, FACE_06, FACE_07, FACE_08, VOICE_VIDEO]}, assetType: {type: string, enum: [FACE_PHOTO, VOICE_VIDEO]}, label: {type: string}, required: {type: boolean}, maxFileSize: {type: integer}, mimeTypes: {type: array, items: {type: string}}}}
+    CollectionEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [sessionId, status, photoRequiredCount, videoRequired, requiredSlots, resumed], properties: {sessionId: {type: string}, status: {type: string, enum: [DRAFT, COLLECTING]}, photoRequiredCount: {type: integer, enum: [8]}, videoRequired: {type: boolean, enum: [true]}, requiredSlots: {type: array, minItems: 9, maxItems: 9, items: {$ref: '#/components/schemas/CaptureSlot'}}, resumed: {type: boolean}, reshoot: {type: boolean}}}}}]}
+    UploadCredentialEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [uploadToken, uploadURL, expiresIn, method, headers], properties: {uploadToken: {type: string}, uploadURL: {type: string, format: uri}, expiresIn: {type: integer, enum: [600]}, method: {type: string, enum: [PUT]}, headers: {type: object, required: [Content-Type], properties: {Content-Type: {type: string}}}}}}}]}
+    AssetConfirmEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [assetId, captureSlot, status], properties: {assetId: {type: string}, captureSlot: {type: string, enum: [FACE_01, FACE_02, FACE_03, FACE_04, FACE_05, FACE_06, FACE_07, FACE_08, VOICE_VIDEO]}, status: {type: string, enum: [CONFIRMED]}}}}}]}
+    BodyDataEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [sessionId, status], properties: {sessionId: {type: string}, status: {type: string, enum: [SAVED]}}}}}]}
+    SubmitEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [status, processingTaskId], properties: {status: {type: string, enum: [AUTO_QUALITY_CHECKING]}, processingTaskId: {type: string}}}}}]}
+    ProfileEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [profileId, profileNo, version, status, realNameStatus, collectionStatus, qualityStatus, archiveStatus, latestSessionId, summary, canRequestDeletion], properties: {profileId: {type: string}, profileNo: {type: string}, version: {type: integer}, status: {type: string, enum: [NOT_STARTED, COLLECTING, AUTO_QUALITY_CHECKING, MANUAL_REVIEW, ARCHIVED, RESHOOT_REQUIRED, DELETION_REQUESTED, DELETED]}, realNameStatus: {type: string, enum: [PENDING, PASSED, REJECTED]}, collectionStatus: {type: string, enum: [NOT_STARTED, COLLECTING, SUBMITTED, PASSED, REJECTED]}, qualityStatus: {type: string, enum: [NOT_STARTED, PENDING, PASSED, REJECTED, MANUAL_REVIEW]}, archiveStatus: {type: string, enum: [NOT_STARTED, ARCHIVED]}, archivedAt: {type: string, format: date-time, nullable: true}, retentionUntil: {type: string, format: date-time, nullable: true}, latestSessionId: {type: string}, submittedAt: {type: string, format: date-time, nullable: true}, summary: {type: object, required: [photoCount, videoCount, bodyDataFilled], properties: {photoCount: {type: integer}, videoCount: {type: integer}, bodyDataFilled: {type: boolean}}}, canRequestDeletion: {type: boolean}}}}}]}
+    DeletionEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [deletionRequestId, status], properties: {deletionRequestId: {type: string}, status: {type: string, enum: [PENDING]}}}}}]}
+    DeletionLatestEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [status], properties: {deletionRequestId: {type: string}, status: {type: string, enum: [NONE, PENDING, APPROVED, PROCESSING, COMPLETED, REJECTED]}, decision: {type: string}, reason: {type: string}, requestedAt: {type: string, format: date-time}, approvedAt: {type: string, format: date-time, nullable: true}, purgedAt: {type: string, format: date-time, nullable: true}}}}}]}
+
+    Ok:
+      description: 兼容旧引用；新接口响应必须使用对应的具名 Response。
+      headers:
+        Idempotency-Replayed: {schema: {type: string, enum: ['true']}, description: 相同幂等键与请求体命中首次结果时返回。}
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, message, requestId, timestamp]
+            properties:
+              code: {type: string, example: OK}
+              message: {type: string, example: 成功}
+              data: {}
+              requestId: {type: string}
+              timestamp: {type: string, format: date-time}
   requestBodies:
     Sms: {required: true, content: {application/json: {schema: {type: object, required: [mobile, scene], properties: {mobile: {type: string}, scene: {type: string, enum: [AVATAR_LOGIN]}}}}}}
     Login: {required: true, content: {application/json: {schema: {type: object, required: [mobile, smsCode], properties: {mobile: {type: string}, smsCode: {type: string}}}}}}
     Refresh: {required: true, content: {application/json: {schema: {type: object, required: [refreshToken], properties: {refreshToken: {type: string}}}}}}
     MockIdentityStart: {required: true, content: {application/json: {schema: {type: object, required: [verificationMethod], properties: {verificationMethod: {type: string, enum: [MOCK]}}}}}}
     MockIdentityComplete: {required: true, content: {application/json: {schema: {type: object, required: [name, gender], properties: {name: {type: string}, gender: {type: string, enum: [MALE, FEMALE]}, idNumberLast4: {type: string, maxLength: 4}}}}}}
-    Binding: {required: true, content: {application/json: {schema: {type: object, required: [registrationCode], properties: {registrationCode: {type: string}}}}}}
+    Binding: {required: true, content: {application/json: {schema: {type: object, required: [registrationCode, name, gender], properties: {registrationCode: {type: string}, name: {type: string}, gender: {type: string, enum: [MALE, FEMALE]}}}}}}
     Consent: {required: true, content: {application/json: {schema: {type: object, required: [consentType, agreementVersion, accepted], properties: {consentType: {type: string, enum: [COLLECT_AND_ARCHIVE]}, agreementVersion: {type: string}, accepted: {type: boolean, enum: [true]}}}}}}
-    UploadCredential: {required: true, content: {application/json: {schema: {type: object, required: [assetType, captureSlot, contentHash, mimeType, fileSize], properties: {assetType: {type: string}, captureSlot: {type: string}, contentHash: {type: string, minLength: 64, maxLength: 64}, mimeType: {type: string}, fileSize: {type: integer, minimum: 1}}}}}}
+    UploadCredential: {required: true, content: {application/json: {schema: {type: object, required: [assetType, captureSlot, contentHash, mimeType, fileSize], properties: {assetType: {type: string, enum: [FACE_PHOTO, VOICE_VIDEO]}, captureSlot: {type: string, description: FACE_01 至 FACE_08，或 VOICE_VIDEO}, contentHash: {type: string, minLength: 64, maxLength: 64, description: 文件原始字节 SHA-256 小写十六进制}, mimeType: {type: string}, fileSize: {type: integer, minimum: 1, maximum: 209715200}}}}}}
     AssetConfirm: {required: true, content: {application/json: {schema: {type: object, required: [uploadToken, contentHash], properties: {uploadToken: {type: string}, contentHash: {type: string}}}}}}
     BodyData: {required: true, content: {application/json: {schema: {type: object, required: [gender, heightCm, bodyType], properties: {gender: {type: string}, heightCm: {type: number}, bodyType: {type: string}, bustCm: {type: number}, waistCm: {type: number}, hipsCm: {type: number}}}}}}
     Reason: {required: false, content: {application/json: {schema: {type: object, properties: {reason: {type: string}}}}}}
