@@ -21,6 +21,13 @@ paths:
     get: {tags: [名单], summary: 查询导入批次, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
   /avatar/roster-batches/{id}:
     get: {tags: [名单], summary: 查询导入批次详情, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/roster-batches/{id}/identity-verifications/run:
+    post:
+      tags: [名单]
+      summary: 手动执行本批次待核验名单的实名核验
+      description: "仅 AVATAR_ROSTER_MANAGE 可调用；只处理 PENDING_IDENTITY，已核验通过或失败记录不重复核验。test 环境使用 Mock。"
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses: {'200': {$ref: '#/components/responses/RosterIdentityRun'}, '400': {$ref: '#/components/responses/Envelope'}, '404': {$ref: '#/components/responses/Envelope'}, '503': {$ref: '#/components/responses/Envelope'}}
   /avatar/roster-batches/{id}/errors:
     get: {tags: [名单], summary: 下载错误回执, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {description: xlsx 文件}}}
   /avatar/roster-members:
@@ -70,10 +77,12 @@ components:
   responses:
     Envelope: {description: 统一成功或业务错误响应, content: {application/json: {schema: {$ref: '#/components/schemas/Envelope'}}}}
     QRCodeCreated: {description: 二维码创建成功, content: {application/json: {schema: {$ref: '#/components/schemas/QRCodeCreatedEnvelope'}}}}
+    RosterIdentityRun: {description: 批次实名核验结果, content: {application/json: {schema: {$ref: '#/components/schemas/RosterIdentityRunEnvelope'}}}}
   schemas:
     Envelope: {type: object, required: [code, message, requestId, timestamp], properties: {code: {type: string}, message: {type: string}, data: {type: object, additionalProperties: true}, requestId: {type: string}, timestamp: {type: string, format: date-time}}}
     QRCodeCreatedEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [qrcodeId, shortCode, registrationURL, registrationPath, status], properties: {qrcodeId: {type: string}, shortCode: {type: string, description: 不可作为账号或凭据使用的城市入口短码}, registrationURL: {type: string, format: uri, description: 前端二维码组件必须编码的完整独立 H5 地址}, registrationPath: {type: string, description: 仅用于 H5 向后端解析城市入口上下文的 API 路径}, status: {type: string, enum: [ACTIVE]}}}}}]}
-    RosterImport: {type: object, required: [file], properties: {file: {type: string, format: binary, description: 当前仅接受表头 姓名、手机号、性别 的 xlsx}}}
+    RosterImport: {type: object, required: [file], properties: {file: {type: string, format: binary, description: 当前仅接受表头 姓名、身份证号、手机号、性别 的 xlsx}}}
+    RosterIdentityRunEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [batchId, processedCount, status, successCount, failedCount], properties: {batchId: {type: string}, processedCount: {type: integer, minimum: 0}, status: {type: string, enum: [PENDING_IDENTITY, COMPLETED, PARTIAL_FAILED, FAILED]}, successCount: {type: integer}, failedCount: {type: integer}}}}}]}
     CityConfig: {type: object, required: [supportContactName, supportContactPhone], properties: {supportContactName: {type: string}, supportContactPhone: {type: string}}}
     Notification: {type: object, properties: {templateCode: {type: string}}}
     QualityQueue: {type: object, required: [reviewType, reasonCode], properties: {reviewType: {type: string, enum: [SAMPLE, RISK]}, reasonCode: {type: string}, reason: {type: string}}}
