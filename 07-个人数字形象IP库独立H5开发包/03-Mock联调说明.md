@@ -13,3 +13,5 @@ Mock 仅在后端 `test` 环境注册。前端通过部署环境配置启用测�
 > 生产环境提示：H5 不调用 Mock 实名接口。名单已由后台在导入时完成 Mock 实名核验，H5 提交姓名、性别，后端结合已短信验证的手机号完成绑定。所有写操作均必须携带 `Idempotency-Key`；重试须复用键和原请求体。
 
 测试用例必须覆盖：二维码无效或城市暂停、短信限频（读取 `retryAfter`）、姓名/手机号/性别不匹配、授权未同意、照片或视频未齐（读取 `missingSlots`）、质检处理中、补采、删除处理中、token 刷新失效和重复点击；同时验证成功外层码为字符串 `OK`、照片槽位为 `FACE_01` 至 `FACE_08`、视频为 `VOICE_VIDEO`、上传凭证字段为 `uploadURL`、照片仅 `image/jpeg` 且最大 8 MiB、视频仅 `video/mp4` 或 `video/webm` 且最大 60 MiB。相同键和请求体须返回 `Idempotency-Replayed: true`，不同请求体同键必须为 `409 IDEMPOTENCY_CONFLICT`。
+
+本地联调使用后端 `test.yaml` 的 `file.storage.provider: mock`。上传凭证会返回 `http://127.0.0.1:8080/api/v1/mock-storage/upload?...`，H5 仍按 `PUT + headers.Content-Type + 原始 File/Blob` 上传；后端测试 CORS 已允许 `http://localhost:5273` 与 `http://127.0.0.1:5273`。该 Mock 仅用于本地测试，不能作为生产 COS 直传或生产验收依据。
