@@ -70,6 +70,7 @@ paths:
   /avatar/collection-sessions:
     post:
       tags: [AVATAR_H5]
+      description: 仅首次建档创建采集会话；采集中重入时返回原会话。已提交、质检中或已归档返回 409 AVATAR_COLLECTION_ALREADY_SUBMITTED，必须读取档案进度，不能再次提交。
       responses: {'201': {$ref: '#/components/responses/CollectionOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}, '412': {$ref: '#/components/responses/Error'}}
   /avatar/collection-sessions/{id}/assets/upload-credentials:
     post:
@@ -110,6 +111,7 @@ paths:
   /avatar/profiles/me/reshoot:
     post:
       tags: [AVATAR_H5]
+      description: 仅档案状态为 RESHOOT_REQUIRED 时可创建补采会话；已归档档案不可主动重复建档。
       requestBody: {$ref: '#/components/requestBodies/Reason'}
       responses: {'201': {$ref: '#/components/responses/CollectionOk'}, '401': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
   /avatar/profiles/me/deletion-requests:
