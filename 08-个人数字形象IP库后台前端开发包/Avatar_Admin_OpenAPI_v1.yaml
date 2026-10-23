@@ -39,8 +39,12 @@ paths:
   /avatar/city-registration-config:
     put: {tags: [兼容接口], deprecated: true, summary: 历史城市联系人配置, description: "二维码与扫码 H5 已改为统一使用后端 avatar.fallback_support_phone 固定客服电话；后台前端不得再调用此接口。", requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CityConfig'}}}}, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
   /avatar/registration-qrcodes:
-    get: {tags: [建档入口], summary: 查询二维码, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
-    post: {tags: [建档入口], summary: 创建二维码, description: "以响应 data.registrationURL（完整独立 H5 地址）生成二维码；shortCode 仅作城市入口定位，绝不含城市账号或登录态。", responses: {'201': {$ref: '#/components/responses/QRCodeCreated'}}}
+    get: {tags: [建档入口], summary: 查询固定二维码及下载能力, responses: {'200': {$ref: '#/components/responses/Envelope'}}}
+    post: {tags: [建档入口], summary: 创建或复用固定二维码, description: "无当前二维码时创建；已有二维码返回同一 registrationURL 和 reused=true，不会自动撤销重建。以 data.registrationURL（完整独立 H5 地址）生成二维码；shortCode 仅作城市入口定位，绝不含城市账号或登录态。", responses: {'200': {$ref: '#/components/responses/QRCodeCreated'}, '201': {$ref: '#/components/responses/QRCodeCreated'}, '409': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/registration-qrcodes/{id}/download:
+    get: {tags: [建档入口], summary: 下载固定二维码 PNG, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {description: PNG 图像, content: {image/png: {schema: {type: string, format: binary}}}}, '409': {$ref: '#/components/responses/Envelope'}}}
+  /avatar/registration-qrcodes/{id}/rotate:
+    post: {tags: [建档入口], summary: 显式更换二维码, description: "必须由前端二次确认；旧二维码立即 REVOKED，新二维码成为该城市唯一当前二维码。", parameters: [{$ref: '#/components/parameters/Id'}], responses: {'201': {$ref: '#/components/responses/QRCodeCreated'}, '409': {$ref: '#/components/responses/Envelope'}}}
   /avatar/registration-qrcodes/{id}/pause:
     post: {tags: [建档入口], summary: 暂停二维码, parameters: [{$ref: '#/components/parameters/Id'}], responses: {'200': {$ref: '#/components/responses/Envelope'}}}
   /avatar/registration-qrcodes/{id}/resume:
@@ -80,7 +84,7 @@ components:
     RosterIdentityRun: {description: 批次实名核验结果, content: {application/json: {schema: {$ref: '#/components/schemas/RosterIdentityRunEnvelope'}}}}
   schemas:
     Envelope: {type: object, required: [code, message, requestId, timestamp], properties: {code: {type: string}, message: {type: string}, data: {type: object, additionalProperties: true}, requestId: {type: string}, timestamp: {type: string, format: date-time}}}
-    QRCodeCreatedEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [qrcodeId, shortCode, registrationURL, registrationPath, status], properties: {qrcodeId: {type: string}, shortCode: {type: string, description: 不可作为账号或凭据使用的城市入口短码}, registrationURL: {type: string, format: uri, description: 前端二维码组件必须编码的完整独立 H5 地址}, registrationPath: {type: string, description: 仅用于 H5 向后端解析城市入口上下文的 API 路径}, status: {type: string, enum: [ACTIVE]}}}}}]}
+    QRCodeCreatedEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [qrcodeId, shortCode, registrationURL, registrationPath, status, downloadPath], properties: {qrcodeId: {type: string}, qrcodeNo: {type: string}, shortCode: {type: string, description: 不可作为账号或凭据使用的城市入口短码}, registrationURL: {type: string, format: uri, description: 前端二维码组件必须编码的完整独立 H5 地址}, registrationPath: {type: string, description: 仅用于 H5 向后端解析城市入口上下文的 API 路径}, downloadPath: {type: string, description: 后台授权下载 PNG 的接口路径}, reused: {type: boolean, description: true 表示复用了既有固定二维码}, rotated: {type: boolean}, status: {type: string, enum: [ACTIVE, PAUSED]}}}}}]}
     RosterImport: {type: object, required: [file], properties: {file: {type: string, format: binary, description: 当前仅接受表头 姓名、身份证号、手机号、性别 的 xlsx}}}
     RosterIdentityRunEnvelope: {allOf: [{$ref: '#/components/schemas/Envelope'}, {type: object, properties: {data: {type: object, required: [batchId, processedCount, status, successCount, failedCount], properties: {batchId: {type: string}, processedCount: {type: integer, minimum: 0}, status: {type: string, enum: [PENDING_IDENTITY, COMPLETED, PARTIAL_FAILED, FAILED]}, successCount: {type: integer}, failedCount: {type: integer}}}}}]}
     CityConfig: {type: object, required: [supportContactName, supportContactPhone], properties: {supportContactName: {type: string}, supportContactPhone: {type: string}}}
