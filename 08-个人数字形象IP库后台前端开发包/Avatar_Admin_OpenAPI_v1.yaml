@@ -10,11 +10,11 @@ servers:
 security: [{AdminBearer: []}]
 paths:
   /avatar/rosters/template:
-    get: {tags: [名单], summary: 下载当前可联调三列模板, responses: {'200': {description: xlsx 文件}}}
+    get: {tags: [名单], summary: 下载四列名单模板（姓名、身份证号、手机号、性别）, responses: {'200': {description: xlsx 文件}}}
   /avatar/roster-batches/import:
     post:
       tags: [名单]
-      summary: 导入名单（当前仅姓名、手机号、性别）
+      summary: 导入名单（姓名、身份证号、手机号、性别）
       requestBody: {required: true, content: {multipart/form-data: {schema: {$ref: '#/components/schemas/RosterImport'}}}}
       responses: {'201': {$ref: '#/components/responses/Envelope'}}
   /avatar/roster-batches:
