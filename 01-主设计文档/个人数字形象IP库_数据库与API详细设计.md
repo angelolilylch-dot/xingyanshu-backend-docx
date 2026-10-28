@@ -30,7 +30,7 @@
 | --- | --- | --- |
 | `avatar_roster_batch` | `batch_no`、`city_org_id`、`city_code`、`source_file_name`、`source_file_hash`、`total_count`、`success_count`、`failed_count`、`imported_by`、`imported_at` | `batch_no` 唯一；索引 `(city_org_id, created_at)`；状态：`IMPORTING/COMPLETED/PARTIAL_FAILED/FAILED`。`error_summary_json` 仅存概要。 |
 | `avatar_roster_import_error` | `roster_batch_id`、`row_no`、`error_code`、`error_message` | 每个失败行一条受控错误明细；仅同城市运营者可下载为 XLSX 回执，不保存原始单元格内容。 |
-| `avatar_roster_member` | `roster_batch_id`、`city_org_id`、`city_code`、`person_no`、`person_type`、`name_cipher`、`name_hash`、`id_number_cipher`（待实现）、`id_number_hash`（待实现）、`id_number_last4`（待实现）、`mobile_cipher`、`mobile_hash`、`mobile_masked`、`gender`、`import_identity_status`（待实现）、`bound_account_id`、`registration_status`、`profile_id` | `person_no` 唯一；活跃记录在同城市内 `(city_org_id, mobile_hash)` 唯一；目标规则是导入姓名、身份证号、性别、手机号并完成后台实名 Mock 后才导入。当前代码仅支持姓名、手机号、性别，身份证号字段与导入前实名核验待后端实现。跨城市同手机号不自动绑定，转平台人工处理。 |
+| `avatar_roster_member` | `roster_batch_id`、`city_org_id`、`city_code`、`person_no`、`person_type`、`name_cipher`、`name_hash`、`id_number_cipher`、`id_number_hash`、`id_number_last4`、`mobile_cipher`、`mobile_hash`、`mobile_masked`、`gender`、`identity_provider_code`、`identity_provider_request_no`、`identity_response_digest`、`identity_verified_at`、`bound_account_id`、`registration_status`、`profile_id` | `person_no` 唯一；活跃记录在同城市内 `(city_org_id, mobile_hash)` 唯一。名单先加密入库为 `PENDING_IDENTITY`，后台手动触发腾讯云 `PhoneVerification` 三要素核验，结果为 `0` 后转为 `ACTIVE`；跨城市同手机号不自动绑定，转平台人工处理。 |
 | `avatar_sms_notification` | `notification_no`、`roster_member_id`、`mobile_hash`、`template_code`、`send_channel`、`send_status`、`provider_request_no`、`sent_at`、`retry_count`、`expire_at` | `notification_no` 唯一；发送内容仅含建档提醒与入口，不写实名或素材信息；索引 `(roster_member_id, created_at)`、`(mobile_hash, created_at)`。状态：`PENDING/SENT/DELIVERED/FAILED/CANCELLED`。 |
 | `avatar_city_registration_config` | `city_org_id`、`city_code`、`support_contact_name`、`support_phone_cipher`、`support_phone_masked`、`updated_by` | 每城市一条当前有效配置；`city_org_id` 唯一；H5 仅返回脱敏联系电话与平台统一的保存期限说明。 |
 | `avatar_registration_qrcode` | `qrcode_no`、`city_registration_config_id`、`city_org_id`、`city_code`、`code_hash`、`status`、`expires_at`、`scan_count`、`created_by` | `qrcode_no`、`code_hash` 唯一；城市长期通用码，默认 `expires_at=NULL`；二维码仅携带随机短码，不携带姓名、手机号或身份证信息；同城市同一时刻仅一条 `ACTIVE`；状态：`ACTIVE/PAUSED/REVOKED`，轮换后旧码撤销。 |
@@ -67,7 +67,13 @@
 
 ## 3. 关键逻辑约束
 
-1. 扫通用二维码不创建账户、不改变名单状态；后台导入名单时完成 Mock 实名核验。H5 短信登录后提交姓名、性别，后端以姓名 + 登录手机号 + 性别与同一城市有效名单三项一致后创建/绑定 `avatar_h5_account`。任何一项不一致均返回统一拒绝结果和城市运营方完整联系电话，不暴露具体不一致项或他人名单信息。
+1. 扫通用二维码不创建账户、不改变名单状态；后台导入名单仅做格式与重复校验并加密入库，运营人员手动触发批次实名核验。H5 短信登录后提交姓名、性别，后端以姓名 + 登录手机号 + 性别与同一城市实名核验通过的名单三项一致后创建/绑定 `avatar_h5_account`。任何一项不一致均返回统一拒绝结果和城市运营方完整联系电话，不暴露其他人员资料。
+
+### 3.1 腾讯云实名服务配置
+
+- 名单三要素核验使用 `PhoneVerification`：`avatar.roster_identity_provider=tencent_phone_verification`，仅由后台“立即执行实名核验”按钮触发，默认 `verify_mode="0"`（简版）；改为 `"1"` 才会返回不一致细分原因，计费以腾讯云规则为准。
+- H5 采集提交后的人脸本人一致性核验使用 `ImageRecognitionV2`，由自动质检 Worker 执行，不提供后台人工触发入口。
+- 环境变量共 6 个：`XINGYANSHU_FACEID_PROVIDER`、`XINGYANSHU_FACEID_SECRET_ID`、`XINGYANSHU_FACEID_SECRET_KEY`、`XINGYANSHU_FACEID_RSA_PUBLIC_KEY`、`XINGYANSHU_ROSTER_IDV_SECRET_ID`、`XINGYANSHU_ROSTER_IDV_SECRET_KEY`。两类腾讯云调用可复用同一对 SecretId/SecretKey 的值，但不得写入 YAML、Git、日志或接口响应。
 2. 同一名单人员只能绑定一个有效 `avatar_h5_account`；同一账户不得自动跨城市绑定，跨城市冲突返回 `AVATAR_ROSTER_CITY_CONFLICT`。
 3. 有效 `COLLECT_AND_ARCHIVE` 授权、三项名单绑定成功，二者同时满足才允许创建采集会话；名单的 Mock 实名核验由后台导入流程负责。
 4. 自动质检通过即直接归档；仅质量异常、抽检命中或风控命中时创建人工复核任务，且仅平台管理员可受控预览。

@@ -31,12 +31,27 @@
 ## 运营名单模板与生产边界
 
 - 统一模板：`M:\工作目录\星恒云创\01-交付文档\v0.5\01-主设计文档\个人数字形象IP库_运营模板\个人数字形象IP库_职业模特名单导入模板.xlsx`；表头固定为“姓名、身份证号、手机号、性别”，性别仅限男/女。
-- 批量导入第一阶段仅做格式和重复校验，并将身份证号加密入库为 `PENDING_IDENTITY`；Worker 解密后逐条调用实名服务（测试环境为 Mock），通过后才转为 `ACTIVE`。完整身份证号不得写入日志、错误回执、列表、导出或 H5 响应。
+- 批量导入第一阶段仅做格式和重复校验，并将身份证号加密入库为 `PENDING_IDENTITY`；运营人员点击批次“立即执行实名核验”后，服务端仅在内存中解密姓名、身份证号、手机号并调用腾讯云 `PhoneVerification` 三要素核验（`avatar.roster_identity_provider=tencent_phone_verification`）。结果为 `0` 才转为 `ACTIVE`；不一致或服务异常均不放行。测试环境可保留 Mock。完整身份证号、腾讯云密钥及上游明文响应不得写入日志、错误回执、列表、导出或 H5 响应。
 - 导入人数没有业务上限；当前接口在请求内解析 XLSX，部署时仍应按网关、内存和超时配置规划单文件容量。
 - 二维码接口返回可供前端生成二维码图的长期短码，不保存或返回人员隐私信息。
 - 运营端“发送短信提醒”只在测试环境有受控成功路径；生产环境未配置短信供应商时必须拒绝发送，不能伪造成功。
 
 ## 验收基线
+
+## 腾讯云核验配置
+
+名单三要素核验与采集后的人脸本人一致性核验共需以下 6 个环境变量；两类服务可复用同一对腾讯云 `SecretId`/`SecretKey` 值：
+
+```text
+XINGYANSHU_FACEID_PROVIDER=tencent_image_recognition_v2
+XINGYANSHU_FACEID_SECRET_ID
+XINGYANSHU_FACEID_SECRET_KEY
+XINGYANSHU_FACEID_RSA_PUBLIC_KEY
+XINGYANSHU_ROSTER_IDV_SECRET_ID
+XINGYANSHU_ROSTER_IDV_SECRET_KEY
+```
+
+在 YAML 中将 `avatar.roster_identity_provider` 改为 `tencent_phone_verification`，并保持 `avatar.roster_identity` 的 `region: ap-guangzhou`、`verify_mode: "0"`、`timeout: 15s` 配置。人脸核验保留 `avatar.face_identity` 的环境变量引用。密钥不得写入 YAML、Git、日志、错误回执或任何前端响应。
 
 在测试环境执行迁移后，设置 `XINGYANSHU_RUN_DB_TESTS=1`，真实 MySQL 8 + Redis 下运行：
 
