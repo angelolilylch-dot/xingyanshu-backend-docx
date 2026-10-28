@@ -36,8 +36,6 @@
 - 二维码接口返回可供前端生成二维码图的长期短码，不保存或返回人员隐私信息。
 - 运营端“发送短信提醒”只在测试环境有受控成功路径；生产环境未配置短信供应商时必须拒绝发送，不能伪造成功。
 
-## 验收基线
-
 ## 腾讯云核验配置
 
 名单三要素核验与采集后的人脸本人一致性核验共需以下 6 个环境变量；两类服务可复用同一对腾讯云 `SecretId`/`SecretKey` 值：
@@ -52,6 +50,23 @@ XINGYANSHU_ROSTER_IDV_SECRET_KEY
 ```
 
 在 YAML 中将 `avatar.roster_identity_provider` 改为 `tencent_phone_verification`，并保持 `avatar.roster_identity` 的 `region: ap-guangzhou`、`verify_mode: "0"`、`timeout: 15s` 配置。人脸核验保留 `avatar.face_identity` 的环境变量引用。密钥不得写入 YAML、Git、日志、错误回执或任何前端响应。
+
+已使用 `XINGYANSHU_ROSTER_IDV_*` 环境变量完成一次真实 `PhoneVerification` 连通性测试：使用合成格式数据验证签名、请求和服务回执，不写入数据库、不导入名单。可按以下方式复测：
+
+```powershell
+$env:XINGYANSHU_RUN_ROSTER_IDV_LIVE_TEST='1'
+go test .\internal\modules\avatar -run TestTencentPhoneVerificationLive -count=1 -v
+```
+
+## 验收基线
+
+标准可执行文件必须输出到 `G:\Go\xingyanshu-backend\bin\xingyanshu.exe`，不要在仓库根目录保留构建产物：
+
+```powershell
+. .\scripts\use-go125.ps1
+go test ./...
+go build -o .\bin\xingyanshu.exe .\cmd\xingyanshu
+```
 
 在测试环境执行迁移后，设置 `XINGYANSHU_RUN_DB_TESTS=1`，真实 MySQL 8 + Redis 下运行：
 
