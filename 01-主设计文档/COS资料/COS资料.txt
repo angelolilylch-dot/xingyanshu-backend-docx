@@ -1,0 +1,8 @@
+桶名称：testxingyanshu1-1331209793
+
+桶公共域名：testxingyanshu1-1331209793.cos.ap-guangzhou.myqcloud.com
+
+SDK 文档路径：https://cloud.tencent.com/document/product/436/31215
+
+SecretId：请通过部署环境变量或密钥管理服务配置，禁止写入交付文档。
+SecretKey：请通过部署环境变量或密钥管理服务配置，禁止写入交付文档。

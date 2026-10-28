@@ -1,0 +1,6 @@
+SecretId：请通过部署环境变量或密钥管理服务配置，禁止写入交付文档。
+SecretKey：请通过部署环境变量或密钥管理服务配置，禁止写入交付文档。
+
+Biztype：ip_center
+请求域名：tms.tencentcloudapi.com
+调用地域：ap-guangzhou

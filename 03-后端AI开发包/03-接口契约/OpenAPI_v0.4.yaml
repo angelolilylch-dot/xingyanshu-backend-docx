@@ -1,0 +1,1863 @@
+openapi: 3.0.3
+info:
+  title: 星衍树版权二创平台一期 MVP API
+  version: v0.4
+  description: |
+    统一管理后台与消费者 H5 的一期 API 契约。以《一期MVP需求基线与范围说明》《业务状态机与流转规则》《API接口设计说明》为业务依据。
+    数据库不使用物理外键；所有逻辑关联、权限、状态与并发校验由 Go 服务事务完成。
+    金额均使用字符串表达的十进制数；业务 ID 均使用字符串，避免 JavaScript 精度丢失。
+servers:
+  - url: /api/v1
+    description: 默认网关前缀
+tags:
+  - name: 公共与登录
+  - name: 创作者认证
+  - name: IP与方案
+  - name: 授权与合同
+  - name: 作品与内容
+  - name: 消费者H5
+  - name: 履约与售后
+  - name: 财务结算
+  - name: 文件、存证与运维
+security:
+  - bearerAuth: []
+paths:
+  /auth/captcha:
+    get:
+      tags: [平台账号管理]
+      summary: 获取后台图形验证码
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /auth/login:
+    post:
+      tags: [公共与登录]
+      summary: 所有后台角色统一登录
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UnifiedLoginRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/password-reset/sms/send:
+    post:
+      tags: [公共与登录]
+      summary: 发送后台账号密码找回短信验证码
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PasswordResetSMSRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '503': { $ref: '#/components/responses/ExternalUnavailable' } }
+  /auth/password-reset:
+    post:
+      tags: [公共与登录]
+      summary: 通过短信验证码找回后台账号密码
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PasswordResetRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /auth/password/change:
+    post:
+      tags: [公共与登录]
+      summary: 修改当前后台账号密码
+      description: 首次登录或管理员重置后的账号只能访问本接口，修改成功后恢复正常访问。
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PasswordChangeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '428': { $ref: '#/components/responses/StateConflict' } }
+  /auth/refresh:
+    post:
+      tags: [公共与登录]
+      summary: 刷新后台或创作者会话令牌
+      description: "无需 Authorization；只提交当前最新 refreshToken。适用于 ADMIN_WEB 与 CREATOR_WEB，成功后返回新的 accessToken 与 refreshToken，旧刷新令牌立即失效。"
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RefreshRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /auth/logout:
+    post:
+      tags: [公共与登录]
+      summary: 注销当前后台或创作者会话
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /auth/me:
+    get:
+      tags: [公共与登录]
+      summary: 获取当前后台账号或创作者登录态（含角色、权限与可见菜单）
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /admin/accounts:
+    get:
+      tags: [平台账号管理]
+      summary: 查询后台账号列表
+      x-roles: [平台管理员]
+      parameters:
+        - { name: keyword, in: query, schema: { type: string, maxLength: 50 } }
+        - { name: orgId, in: query, schema: { type: string } }
+        - { name: roleCode, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [ACTIVE, SUSPENDED] } }
+        - { name: pageNo, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [平台账号管理]
+      summary: 新增后台账号
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminAccountCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/accounts/{userId}:
+    get:
+      tags: [平台账号管理]
+      summary: 获取后台账号详情
+      x-roles: [平台管理员]
+      parameters: [ { name: userId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [平台账号管理]
+      summary: 编辑后台账号资料、组织、角色与数据范围
+      x-roles: [平台管理员]
+      parameters: [ { name: userId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminAccountUpdateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/accounts/{userId}/status:
+    patch:
+      tags: [平台账号管理]
+      summary: 启用或停用后台账号
+      x-roles: [平台管理员]
+      parameters: [ { name: userId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminAccountStatusRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/accounts/{userId}/password/reset:
+    post:
+      tags: [平台账号管理]
+      summary: 管理员重置后台账号密码
+      x-roles: [平台管理员]
+      parameters: [ { name: userId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PasswordResetByAdminRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /admin/orgs/options:
+    get:
+      tags: [组织管理]
+      summary: 获取已启用组织下拉选项
+      x-roles: [平台管理员]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/orgs:
+    get:
+      tags: [组织管理]
+      summary: 查询组织列表
+      x-roles: [平台管理员]
+      parameters:
+        - { name: keyword, in: query, schema: { type: string, maxLength: 50 } }
+        - { name: orgType, in: query, schema: { type: string, enum: [GROUP, PLATFORM, CITY] } }
+        - { name: status, in: query, schema: { type: string, enum: [ACTIVE, SUSPENDED] } }
+        - { name: pageNo, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [组织管理]
+      summary: 新增组织
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrgCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/orgs/{orgId}:
+    get:
+      tags: [组织管理]
+      summary: 获取组织详情
+      x-roles: [平台管理员]
+      parameters: [ { name: orgId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [组织管理]
+      summary: 编辑组织名称、上级组织或城市编码
+      x-roles: [平台管理员]
+      parameters: [ { name: orgId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrgUpdateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/orgs/{orgId}/status:
+    patch:
+      tags: [组织管理]
+      summary: 启用或停用组织
+      x-roles: [平台管理员]
+      parameters: [ { name: orgId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrgStatusRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/auth/sms/send:
+    post:
+      tags: [公共与登录]
+      summary: 发送消费者注册或登录短信验证码
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConsumerSmsRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /auth-plans/{planId}:
+    get:
+      tags: [IP与方案]
+      summary: 查询固定授权方案详情
+      x-roles: [平台管理员, 版权合规, 城市运营]
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /auth-plans/{planId}/draft:
+    patch:
+      tags: [IP与方案]
+      summary: 修改草稿或退回的授权方案
+      x-roles: [平台管理员]
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AuthPlanUpdateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/auth/login:
+    post:
+      tags: [公共与登录]
+      summary: 消费者短信登录或自动注册
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConsumerLoginRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /consumer/auth/refresh:
+    post:
+      tags: [公共与登录]
+      summary: 刷新消费者会话令牌
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RefreshRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /consumer/auth/logout:
+    post:
+      tags: [公共与登录]
+      summary: 注销消费者会话
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/me:
+    get:
+      tags: [公共与登录]
+      summary: 获取消费者脱敏资料及业务数量
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /dictionaries/{dictType}:
+    get:
+      tags: [公共与登录]
+      summary: 获取固定公开枚举字典项
+      description: 仅允许读取服务端固定白名单枚举（如 IP_TYPE）；无须登录，且不开放任何字典维护能力。
+      security: []
+      parameters:
+        - { name: dictType, in: path, required: true, schema: { type: string } }
+        - { name: enabledOnly, in: query, schema: { type: boolean, default: true } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /public/regions:
+    get:
+      tags: [消费者H5]
+      summary: 获取公开地区树
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/Keyword' }
+        - { name: level, in: query, schema: { type: string, enum: [NATION, PROVINCE, CITY, DISTRICT] } }
+        - { name: parentCode, in: query, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /tags:
+    get:
+      tags: [公共与登录]
+      summary: 查询后台标签
+      parameters: [ { name: tagType, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Keyword' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /admin/tags:
+    get:
+      tags: [平台基础配置]
+      summary: 查询全部标签（含停用项）
+      x-roles: [平台管理员]
+      parameters: [ { name: tagType, in: query, schema: { type: string, enum: [REGION, CULTURE, CATEGORY, COMMERCIAL] } }, { $ref: '#/components/parameters/Keyword' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [公共与登录]
+      summary: 新建标签
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TagRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/tags/{tagId}/status:
+    patch:
+      tags: [公共与登录]
+      summary: 启用或停用标签
+      x-roles: [平台管理员]
+      parameters: [ { name: tagId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledChangeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/regions:
+    get:
+      tags: [平台基础配置]
+      summary: 查询全部地区主数据（含停用项）
+      x-roles: [平台管理员]
+      parameters: [ { $ref: '#/components/parameters/Keyword' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [平台基础配置]
+      summary: 新建地区主数据
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RegionRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /admin/regions/{regionId}/status:
+    patch:
+      tags: [平台基础配置]
+      summary: 启用或停用地区主数据
+      x-roles: [平台管理员]
+      parameters: [ { name: regionId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledChangeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/configs:
+    get:
+      tags: [平台基础配置]
+      summary: 查询平台基础配置
+      x-roles: [平台管理员]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/configs/{configKey}:
+    patch:
+      tags: [平台基础配置]
+      summary: 更新非敏感平台配置
+      x-roles: [平台管理员]
+      parameters: [ { name: configKey, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConfigUpdateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/after-sale-templates:
+    get:
+      tags: [平台基础配置]
+      summary: 查询固定售后模板及其版本
+      x-roles: [平台管理员]
+      parameters: [ { name: bizType, in: query, schema: { type: string, enum: [PRODUCT, ACTIVITY] } }, { name: enabledOnly, in: query, schema: { type: boolean, default: false } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [平台基础配置]
+      summary: 新建固定售后模板
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TemplateCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /admin/after-sale-templates/{templateId}/versions:
+    post:
+      tags: [平台基础配置]
+      summary: 创建固定售后模板新版本并停用旧版本
+      x-roles: [平台管理员]
+      parameters: [ { name: templateId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TemplateVersionRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/after-sale-templates/{templateId}/status:
+    patch:
+      tags: [平台基础配置]
+      summary: 启用或停用当前固定售后模板版本
+      x-roles: [平台管理员]
+      parameters: [ { name: templateId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledChangeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/auth/sms/send:
+    post:
+      tags: [创作者认证]
+      summary: 发送创作者注册短信验证码
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreatorSmsRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /creator/auth/register:
+    post:
+      tags: [创作者认证]
+      summary: 注册创作者账号
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreatorRegisterRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /creator/files:
+    post:
+      tags: [创作者认证]
+      summary: 上传创作者私有文件
+      x-roles: [创作者]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /creator/identity-verifications:
+    post:
+      tags: [创作者认证]
+      summary: 发起主体实名核验；企业/工作室通过后自动生成私有 Word 委托书草稿
+      x-roles: [创作者]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/IdentityVerificationRequest' } } } }
+      x-success-response-fields: [verificationNo, identityStatus, authorizationLetterDraftFileId, fileName, downloadUrl, expiresAt]
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' }, '502': { $ref: '#/components/responses/ExternalUnavailable' } }
+  /creator/identity-verifications/latest:
+    get:
+      tags: [创作者认证]
+      summary: 查询最近一次实名核验结果（敏感信息脱敏）
+      x-roles: [创作者]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /creator/authorization-letters:
+    post:
+      tags: [创作者认证]
+      summary: 提交企业或工作室授权委托书
+      x-roles: [创作者]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FileReferenceRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /creator/authorization-letter-template:
+    get:
+      tags: [创作者认证]
+      summary: 下载标准授权委托书模板
+      x-roles: [创作者]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /creator/authorization-letter-draft:
+    get:
+      tags: [创作者认证]
+      summary: 获取企业或工作室自动生成的私有 Word 委托书草稿下载链接
+      description: "仅实名认证通过的企业/工作室本人可访问；短期链接过期时重新调用本接口，不新增签署留存记录。"
+      x-roles: [创作者]
+      x-success-response-fields: [authorizationLetterDraftFileId, fileName, downloadUrl, expiresAt]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/StateConflict' }, '502': { $ref: '#/components/responses/ExternalUnavailable' } }
+  /admin/creators/{creatorId}/status:
+    patch:
+      tags: [创作者认证]
+      summary: 启用或停用创作者
+      x-roles: [平台管理员]
+      parameters: [ { name: creatorId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StatusChangeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips:
+    get:
+      tags: [IP与方案]
+      summary: 查询权限范围内 IP
+      x-roles: [城市运营, 版权合规, 平台管理员, 集团管理层]
+      x-data-scope: 城市运营限本城市；集团管理层只读
+      parameters: [ { $ref: '#/components/parameters/Keyword' }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [IP与方案]
+      summary: 城市运营保存 IP
+      description: 勾选 dciAssistanceRequested 时，服务端在同一事务保存 IP 和 DCI 代办申请；不得与 DCI 证书编号或文件同时提交。
+      x-roles: [城市运营]
+      x-data-scope: 仅允许写入本人所属城市
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/IpCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /ips/{ipId}:
+    get:
+      tags: [IP与方案]
+      description: 版权合规人员与平台管理员可返回授权范围内 IP 的完整敏感字段；城市运营者仅对所属城市 IP 返回完整字段。其他可访问角色仅返回 `*Masked` 脱敏字段；明文字段沿用原字段名。
+      summary: 获取 IP 详情（按角色脱敏）
+      x-roles: [城市运营, 版权合规, 平台管理员, 集团管理层]
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [IP与方案]
+      summary: 修改草稿或补充材料状态的 IP
+      description: DCI 代办仅可在创建 IP 时通过 dciAssistanceRequested 一并申请；本接口不接受该字段。
+      x-roles: [城市运营]
+      x-state-precondition: DRAFT 或 SUPPLEMENT_REQUIRED，确权后主归属城市、权利人和绑定方案不可普通修改
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/IpCreateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips/{ipId}/submit:
+    post:
+      tags: [IP与方案]
+      summary: 提交 IP 至版权/合规审核
+      x-roles: [城市运营]
+      x-idempotency: required
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips/{ipId}/dci-assistance-requests:
+    post:
+      tags: [IP与方案]
+      summary: 申请 DCI 版权证书代办
+      description: 仅用于已保存 IP 后补申请 DCI 代办；不能代替 DCI 证书上传和版权/合规核验。
+      x-roles: [城市运营]
+      x-idempotency: required
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DciAssistanceRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips/{ipId}/dci-certificate:
+    post:
+      tags: [IP与方案]
+      summary: 回填 DCI 代办取得的证书
+      description: 仅回填证书编号及文件，不修改已锁定的 IP、权属材料或素材包。
+      x-roles: [城市运营]
+      x-idempotency: required
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DciCertificateSubmitRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /compliance/ips/pending:
+    get:
+      tags: [IP与方案]
+      summary: 查询版权/合规待审核 IP 主队列
+      description: 仅返回 PENDING_COMPLIANCE 状态的 IP。DCI 已上传时 nextAction 为 VERIFY_DCI；DCI 已核验时为 CONFIRM_RIGHTS。DCI 代办是独立的辅助待办，不混入本队列。
+      x-roles: [版权合规]
+      parameters: [ { $ref: '#/components/parameters/Keyword' }, { name: dciCertificateStatus, in: query, description: DCI证书状态筛选，仅支持 UPLOADED 或 VERIFIED, schema: { type: string, enum: [UPLOADED, VERIFIED] } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /compliance/dci-assistance-requests:
+    get:
+      tags: [IP与方案]
+      summary: 查询 DCI 代办待办
+      x-roles: [版权合规]
+      description: 返回完整联系人姓名和手机号，仅版权合规可读取；读取行为记入审计日志，响应不得缓存或导出。
+      parameters: [ { name: handlingStatus, in: query, schema: { type: string, enum: [PENDING, CONTACTED, PROCESSING, COMPLETED, CLOSED] } }, { $ref: '#/components/parameters/Keyword' }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /compliance/dci-assistance-requests/{requestId}/handle:
+    post:
+      tags: [IP与方案]
+      summary: 更新 DCI 代办处理状态
+      x-roles: [版权合规]
+      x-idempotency: required
+      parameters: [ { name: requestId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DciAssistanceHandleRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /compliance/dci-assistance-requests/{requestId}/application-package:
+    post:
+      tags: [IP与方案]
+      summary: 打包下载 DCI 代办申请资料
+      description: 仅版权合规可调用。系统生成私有 ZIP，内含代办申请 Markdown、IP 作品说明、权属证明和作品附件；可选附带评估报告。响应只返回短期下载地址，不返回联系人明文。
+      x-roles: [版权合规]
+      x-idempotency: required
+      parameters: [ { name: requestId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { includeEvaluationReport: { type: boolean, default: false, description: 是否附带有效评估报告 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' }, '502': { $ref: '#/components/responses/ExternalUnavailable' } }
+  /ips/{ipId}/dci-verifications:
+    post:
+      tags: [IP与方案]
+      summary: 版权/合规核验 DCI 证书
+      x-roles: [版权合规]
+      x-idempotency: required
+      x-success-response-fields: [id, status, mallVisible, suggestedTransactionPriceAmount, version, evidenceId, evidenceReceiptNo, evidenceTransactionHash]
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DciVerificationRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips/{ipId}/rights-reviews:
+    post:
+      tags: [IP与方案]
+      summary: 版权/合规确权或退回补充
+      description: 退回时 comment 必填；确认时必须提交最终授权方案、分账模板和全部参与方比例。存证获得成功回执且上架前置条件满足后，系统在同一事务中直接进入 LISTED 并开放商城可见。
+      x-roles: [版权合规]
+      x-idempotency: required
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RightsReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' }, '502': { $ref: '#/components/responses/ExternalUnavailable' } }
+  /ips/{ipId}/evaluation-reports:
+    post:
+      tags: [IP与方案]
+      summary: 上传 IP 评估报告
+      x-roles: [城市运营, 版权合规]
+      x-state-precondition: 城市运营仅允许本人城市且 IP 为 DRAFT 或 SUPPLEMENT_REQUIRED；版权合规可在审核阶段新增或补传
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EvaluationReportRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' } }
+  /ips/{ipId}/pause:
+    post:
+      tags: [IP与方案]
+      summary: 暂停 IP 新授权购买
+      x-roles: [平台管理员]
+      x-implementation-status: implemented
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /ips/{ipId}/resume:
+    post:
+      tags: [IP与方案]
+      summary: 恢复 IP 新授权购买
+      x-roles: [平台管理员]
+      x-implementation-status: implemented
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /ips/{ipId}/delist:
+    post:
+      tags: [IP与方案]
+      summary: 下架 IP，停止新购买并保留历史合同与订单
+      x-roles: [平台管理员]
+      x-implementation-status: implemented
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth-plans:
+    get:
+      tags: [IP与方案]
+      summary: 查询固定授权方案
+      x-roles: [平台管理员, 版权合规, 城市运营]
+      parameters: [ { name: enabledOnly, in: query, description: "平台管理员 B04 列表和版权合规审核列表必须传 false 查看全部状态；城市 IP 可用方案选择传 true；不传时默认仅返回 ENABLED", schema: { type: boolean, default: true } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [IP与方案]
+      summary: 创建固定授权方案草稿
+      x-roles: [平台管理员]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AuthPlanRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /auth-plans/{planId}/submit:
+    post:
+      tags: [IP与方案]
+      summary: 提交授权方案至合规确认
+      x-roles: [平台管理员]
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /auth-plans/{planId}/reviews:
+    post:
+      tags: [IP与方案]
+      summary: 版权/合规确认或退回授权方案
+      x-roles: [版权合规]
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth-plans/{planId}/enable:
+    post:
+      tags: [IP与方案]
+      summary: 启用已确认授权方案
+      x-roles: [平台管理员]
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth-plans/{planId}/disable:
+    post:
+      tags: [IP与方案]
+      summary: 停用未绑定 IP 的授权方案
+      x-roles: [平台管理员]
+      x-state-precondition: 已绑定任一 IP 的方案必须拒绝停用
+      parameters: [ { name: planId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /distribution-templates:
+    get:
+      tags: [IP与方案]
+      summary: 查询分账结构模板
+      x-roles: [平台管理员, 版权合规, 城市运营]
+      parameters: [ { name: enabledOnly, in: query, schema: { type: boolean, default: true } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [IP与方案]
+      summary: 创建分账结构模板
+      x-roles: [平台管理员]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionTemplateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /distribution-templates/{templateId}:
+    get:
+      tags: [IP与方案]
+      summary: 查询分账结构模板详情
+      x-roles: [平台管理员, 版权合规, 城市运营]
+      parameters: [ { name: templateId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [IP与方案]
+      summary: 修改未绑定IP的分账结构模板
+      x-roles: [平台管理员]
+      parameters: [ { name: templateId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionTemplateUpdateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /distribution-templates/{templateId}/status:
+    patch:
+      tags: [IP与方案]
+      summary: 启用或停用未绑定IP的分账结构模板
+      x-roles: [平台管理员]
+      parameters: [ { name: templateId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /creator/ip-mall:
+    get:
+      tags: [授权与合同]
+      summary: 创作者 IP 商城
+      x-roles: [创作者]
+      parameters: [ { $ref: '#/components/parameters/Keyword' }, { name: regionCode, in: query, description: 主归属城市编码, schema: { type: string } }, { name: ipType, in: query, schema: { type: string } }, { name: tagCodes, in: query, description: 标签编码，多个以英文逗号分隔且需同时匹配, schema: { type: string } }, { name: authorizationMode, in: query, schema: { type: string, enum: [NORMAL_SHARE, EXCLUSIVE_BUYOUT] } }, { name: contentType, in: query, schema: { type: string } }, { name: term, in: query, description: 授权期限类型或期限数值, schema: { type: string } }, { name: minPrice, in: query, schema: { type: string } }, { name: maxPrice, in: query, schema: { type: string } }, { name: sortBy, in: query, description: 不传时按最近一次进入 LISTED 状态的时间倒序，可选 priceAsc、priceDesc、updatedAtAsc, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /creator/ip-mall/{ipId}:
+    get:
+      tags: [授权与合同]
+      summary: 查看已上架 IP 的商城详情
+      x-roles: [创作者]
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/ip-mall/{ipId}/purchase-preview:
+    get:
+      tags: [授权与合同]
+      summary: 授权购买预览及可购买判定（独家买断已售时返回 AUTHORIZATION_QUOTA_SOLD_OUT）
+      x-roles: [创作者]
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/auth-orders:
+    post:
+      tags: [授权与合同]
+      summary: 创建授权待支付订单并预占名额
+      x-roles: [创作者]
+      x-state-precondition: 实名已认证；同一创作者对同一 IP 不存在有效授权或未过期待支付订单；quotaTotal 为空时不限名额
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AuthOrderCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/auth-orders/{authOrderId}:
+    get:
+      tags: [授权与合同]
+      summary: 查询本人授权待支付订单
+      x-roles: [创作者]
+      parameters: [ { name: authOrderId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/auth-orders/{authOrderId}/cancel:
+    post:
+      tags: [授权与合同]
+      summary: 取消待支付授权订单并释放名额
+      x-roles: [创作者]
+      x-state-precondition: 仅 PENDING_PAYMENT；支付成功后不允许取消或退款
+      parameters: [ { name: authOrderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AuthOrderCancelRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /payments/mock/pay:
+    post:
+      tags: [授权与合同]
+      summary: 测试环境模拟授权订单支付成功
+      description: 仅 test 环境注册，仅接受 AUTH_ORDER。支付事务原子完成订单 PAID、名额转正式占用、授权及范围记录、合同生成任务创建；合同 PDF、授权凭证和存证在事务提交后异步处理，失败不回滚支付与授权。
+      x-environments: [test]
+      x-roles: [创作者]
+      x-state-precondition: 订单属于当前创作者、状态为 PENDING_PAYMENT 且未超时
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AuthOrderMockPayRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /payments/wechat-h5/initiate:
+    post:
+      tags: [授权与合同, 消费者H5]
+      summary: 微信支付 V3 H5 下单
+      description: 生产环境调用微信支付 V3 H5 下单并返回 h5Url。业务订单仅在已验签回调或主动查单确认成功后置为已支付。
+      x-roles: [创作者, 消费者]
+      x-state-precondition: 仅订单所有人的 PENDING_PAYMENT 订单可发起；使用 Idempotency-Key 防止重复创建微信支付订单
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /integrations/wechat-pay/notifications:
+    post:
+      tags: [授权与合同, 消费者H5]
+      summary: 微信支付 V3 异步支付通知
+      description: 无需 JWT。服务端必须校验 Wechatpay-Signature、解密回调资源并按微信支付交易号幂等处理；验签或处理失败返回非 2xx。
+      security: []
+      responses: { '200': { description: 已接收并处理 }, '400': { description: 验签或报文错误 }, '500': { description: 可重试的处理失败 } }
+  /creator/authorizations:
+    get:
+      tags: [授权与合同]
+      summary: 查询本人授权
+      x-roles: [创作者]
+      parameters: [ { name: status, in: query, schema: { type: string } }, { name: ipId, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /creator/authorizations/{authorizationId}:
+    get:
+      tags: [授权与合同]
+      summary: 查询本人授权、订单快照、合同及存证状态
+      x-roles: [创作者]
+      parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/authorizations/{authorizationId}/contract:
+    get:
+      tags: [授权与合同]
+      summary: 获取本人正式授权合同 PDF 临时下载链接
+      description: 合同尚在生成时返回 CONTRACT_NOT_READY；存证处理中或失败不影响合同下载。
+      x-roles: [创作者]
+      parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/authorizations/{authorizationId}/certificate:
+    get:
+      tags: [授权与合同]
+      summary: 获取本人授权凭证 PDF 临时下载链接
+      x-roles: [创作者]
+      parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/authorizations/{authorizationId}/material-packs:
+    get:
+      tags: [授权与合同]
+      summary: 查询订单快照所引用的冻结素材包
+      description: 仅返回授权有效且订单素材清单 Hash 一致、素材包已冻结并已存证的可交付素材项。
+      x-roles: [创作者]
+      parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/authorizations/{authorizationId}/material-downloads:
+    post:
+      tags: [授权与合同]
+      summary: 获取授权素材临时下载地址并留痕
+      x-roles: [创作者]
+      x-state-precondition: 仅 ACTIVE、未到期授权可下载订单快照引用的 FROZEN/EVIDENCED 可交付素材；历史合同仍可查看
+      parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialDownloadRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/works:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人二创作品
+      x-roles: [创作者]
+      parameters: [ { $ref: '#/components/parameters/Keyword' }, { name: ipId, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [作品与内容]
+      summary: 提交二创作品
+      x-roles: [创作者]
+      description: 无草稿。仅接受本人有效、未到期且允许二创的授权；引用素材必须来自购买时快照一致、已冻结且已存证的素材包。文本检测通过进入版权初审；疑似风险可人工复核。
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkSubmitRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /copyright/work-versions/{workVersionId}/reviews:
+    post:
+      tags: [作品与内容]
+      summary: 版权初审或合规复核二创作品
+      x-roles: [版权合规]
+      parameters: [ { name: workVersionId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/works/{workId}:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人二创作品详情
+      x-roles: [创作者]
+      parameters: [ { name: workId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/works/{workId}/resubmit:
+    post:
+      tags: [作品与内容]
+      summary: 为退回或失败作品创建新版本并重提交
+      x-roles: [创作者]
+      description: 仅 RETURNED、REJECTED、TEXT_REJECTED、TEXT_CHECK_ERROR 可提交；保留历史版本，且不得更换原始IP。RIGHTS_CONFIRMED 不可覆盖修改。
+      parameters: [ { name: workId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkSubmitRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /copyright/works/pending:
+    get:
+      tags: [作品与内容]
+      summary: 查询版权初审与合规复核待办
+      x-roles: [版权合规]
+      parameters: [ { name: reviewNode, in: query, schema: { type: string, enum: [COPYRIGHT_INITIAL, COMPLIANCE_REVIEW] } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /copyright/works/{workId}/rights-confirmations:
+    post:
+      tags: [作品与内容]
+      summary: 生成二创作品确权快照并提交存证
+      x-roles: [版权合规]
+      parameters: [ { name: workId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WorkRightsConfirmationRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/products:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人商品
+      x-roles: [创作者]
+      parameters:
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: ipId, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: fulfillmentMode, in: query, schema: { type: string, enum: [CREATOR_SHIP, PLATFORM_SHIP] } }
+        - { name: pageNo, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [作品与内容]
+      summary: 提交商品并进入自动校验和二级审核
+      x-roles: [创作者]
+      description: 必须关联有效授权和一件已确权作品。自动校验通过后依次进入版权初审、合规复核；合规复核通过才上架。品牌、生产方、条码、税率均为非必填。
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/products/{productId}:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人商品详情及版本、SKU、审核记录
+      x-roles: [创作者]
+      parameters: [ { name: productId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [作品与内容]
+      summary: 修改退回、驳回或检测失败商品并重新提交；已下架商品新建版本
+      x-roles: [创作者]
+      parameters: [ { name: productId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductCreateRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/products/{productId}/delist:
+    post:
+      tags: [作品与内容]
+      summary: 下架已发布商品
+      x-roles: [创作者]
+      parameters: [ { name: productId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /copyright/products/pending:
+    get:
+      tags: [版权合规]
+      summary: 获取商品版权初审或合规复核待办
+      x-roles: [版权合规]
+      parameters: [ { name: reviewNode, in: query, schema: { type: string, enum: [COPYRIGHT_INITIAL, COMPLIANCE_REVIEW] } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /copyright/product-versions/{productVersionId}/reviews:
+    post:
+      tags: [版权合规]
+      summary: 商品版权初审或合规复核
+      x-roles: [版权合规]
+      parameters: [ { name: productVersionId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/activities:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人活动
+      x-roles: [创作者]
+      parameters: [ { name: keyword, in: query, schema: { type: string } }, { name: ipId, in: query, schema: { type: string } }, { name: cityCode, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [作品与内容]
+      summary: 提交文旅活动并进入系统自动校验
+      x-roles: [创作者]
+      description: 必须关联允许文旅活动、场景含 ACTIVITY 且地区覆盖举办城市的有效授权；不关联作品、不做图片审核或人工审核。文本检测通过即发布。
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityCreateRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/activities/{activityId}:
+    get:
+      tags: [作品与内容]
+      summary: 查询本人活动详情、场次和票种
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/activities/{activityId}/pause-booking:
+    post:
+      tags: [作品与内容]
+      summary: 暂停活动后续报名
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/activities/{activityId}/resume-booking:
+    post:
+      tags: [作品与内容]
+      summary: 恢复活动报名
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/activities/{activityId}/delist:
+    post:
+      tags: [作品与内容]
+      summary: 下架无成功报名活动
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /public/{resource}:
+    get:
+      tags: [消费者H5]
+      summary: 公开浏览资源
+      description: "resource 仅允许 home、products、activities、service-contact。消费者 H5 不提供任何 IP 资源或 IP 字段；公开响应不得泄露合同、权利证明、实名、内部分账、审核意见或存证技术回执。"
+      security: []
+      parameters: [ { name: resource, in: path, required: true, schema: { type: string, enum: [home, products, activities, service-contact] } }, { $ref: '#/components/parameters/Keyword' }, { name: regionCode, in: query, schema: { type: string } }, { name: cityCode, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /public/products/{productId}:
+    get:
+      tags: [消费者H5]
+      summary: 商品公开详情
+      security: []
+      parameters: [ { name: productId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /public/activities/{activityId}:
+    get:
+      tags: [消费者H5]
+      summary: 活动公开详情
+      security: []
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /public/media/{fileId}:
+    get:
+      tags: [消费者H5]
+      summary: 获取公开展示图片
+      description: 仅可读取当前已发布商品或有效活动引用的封面、详情图、SKU 图；内容下架后拒绝访问，不公开存储键、附件、源文件或版权材料。
+      security: []
+      parameters: [ { name: fileId, in: path, required: true, schema: { type: string } } ]
+      responses:
+        '200': { description: 图片二进制内容, content: { image/*: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /consumer/product-orders/preview:
+    post:
+      tags: [消费者H5]
+      summary: 商品下单预览
+      x-roles: [消费者]
+      description: 每次请求均实时校验商品/SKU 状态、库存、价格、运费及售后规则；浏览器本地购物车不锁库存。请求使用已保存的 addressId。
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductOrderRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' } }
+  /consumer/product-orders:
+    post:
+      tags: [消费者H5]
+      summary: 创建商品待支付订单并预占 SKU 库存
+      x-roles: [消费者]
+      x-idempotency: required
+      x-state-precondition: 商品已发布且 SKU 可售
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductOrderRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '422': { $ref: '#/components/responses/StateConflict' } }
+    get:
+      tags: [消费者H5]
+      summary: 查询本人商品订单
+      x-roles: [消费者]
+      description: 仅返回当前消费者订单；订单详情中的地址为本人完整快照。
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/addresses:
+    get:
+      tags: [消费者H5]
+      summary: 查询本人地址簿
+      x-roles: [消费者]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [消费者H5]
+      summary: 新增收货地址（最多10条）
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConsumerAddressRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' } }
+  /consumer/addresses/{addressId}:
+    patch:
+      tags: [消费者H5]
+      summary: 编辑本人收货地址
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: addressId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConsumerAddressRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    delete:
+      tags: [消费者H5]
+      summary: 删除本人收货地址（不影响历史订单快照）
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: addressId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/addresses/{addressId}/default:
+    post:
+      tags: [消费者H5]
+      summary: 设置默认收货地址
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: addressId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/product-orders/{orderId}:
+    get:
+      tags: [消费者H5]
+      summary: 查询本人商品订单详情
+      x-roles: [消费者]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /consumer/product-orders/{orderId}/cancel:
+    post:
+      tags: [消费者H5]
+      summary: 取消待支付订单并立即释放库存
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/product-orders/{orderId}/mock-pay:
+    post:
+      tags: [消费者H5]
+      summary: 测试环境 Mock 商品支付
+      description: 仅 test 环境注册；生产环境无此路由。outcome=FAILURE 保持待支付，SUCCESS 转待发货并消耗预占库存。
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductOrderMockPayRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/product-orders/{orderId}/confirm-receipt:
+    post:
+      tags: [消费者H5]
+      summary: 确认收货（API-FUL-01 后实现；当前未注册）
+      x-roles: [消费者]
+      x-state-precondition: 已签收且不存在进行中售后
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/activity-bookings/preview:
+    post:
+      tags: [消费者H5]
+      summary: 预览活动预约（不锁定名额）
+      x-roles: [消费者]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityBookingRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/activity-bookings:
+    post:
+      tags: [消费者H5]
+      summary: 创建活动预约
+      x-roles: [消费者]
+      description: 收费票创建待支付预约并预占名额；免费票直接正式占用名额并生成核销码。
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityBookingRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+    get:
+      tags: [消费者H5]
+      summary: 我的活动预约列表
+      x-roles: [消费者]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/activity-bookings/{bookingId}:
+    get:
+      tags: [消费者H5]
+      summary: 活动预约详情
+      x-roles: [消费者]
+      parameters: [ { name: bookingId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/activity-bookings/{bookingId}/verification-code:
+    get:
+      tags: [消费者H5]
+      summary: 查看待核销预约的核销码
+      x-roles: [消费者]
+      x-state-precondition: 仅 PENDING_VERIFICATION
+      parameters: [ { name: bookingId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/activity-bookings/{bookingId}/cancel-pending-payment:
+    post:
+      tags: [消费者H5]
+      summary: 取消待支付活动预约并释放名额预占
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: bookingId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/activity-bookings/{bookingId}/mock-pay:
+    post:
+      tags: [消费者H5]
+      summary: 测试环境 Mock 活动预约支付
+      description: 仅 test 环境注册；生产环境无此路由。outcome=FAILURE 保持待支付，SUCCESS 转待核销并生成核销码。
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: bookingId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductOrderMockPayRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /fulfillment/product-orders/{orderId}/shipments:
+    post:
+      tags: [履约与售后]
+      summary: 发货
+      x-roles: [履约客服, 创作者]
+      x-data-scope: 创作者仅可处理本人 CREATOR_SHIP 订单
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShipmentRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /fulfillment/verifications:
+    post:
+      tags: [履约与售后]
+      summary: 现场核销活动预约
+      x-roles: [履约客服]
+      x-idempotency: required
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VerificationRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/after-sales/product:
+    post:
+      tags: [履约与售后]
+      summary: 申请商品售后
+      x-roles: [消费者]
+      description: 仅取消退款或退货退款；同一订单项不可并行冲突售后。
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductAfterSaleRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/after-sales/activity:
+    post:
+      tags: [履约与售后]
+      summary: 申请活动取消退款
+      x-roles: [消费者]
+      x-state-precondition: 已核销或已过期预约不得退款
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityAfterSaleRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /fulfillment/after-sales/{afterSaleId}/review:
+    post:
+      tags: [履约与售后]
+      summary: 履约客服审核售后
+      x-roles: [履约客服]
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AfterSaleReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /finance/refunds/{refundId}/review:
+    post:
+      tags: [财务结算]
+      summary: 财务复核退款并触发模拟退款/分账冲销
+      x-roles: [财务]
+      parameters: [ { name: refundId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RefundReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /files:
+    post:
+      tags: [文件、存证与运维]
+      summary: 上传文件
+      security: [ { bearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '413': { description: 文件超出当前大小限制 } }
+  /files/{fileId}:
+    get:
+      tags: [文件、存证与运维]
+      summary: 查询文件元数据
+      security: [ { bearerAuth: [] } ]
+      parameters: [ { name: fileId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /files/{fileId}/download-url:
+    post:
+      tags: [文件、存证与运维]
+      summary: 签发文件短期下载地址
+      security: [ { bearerAuth: [] } ]
+      parameters: [ { name: fileId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '502': { description: COS 签名下载地址生成失败 } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 短效访问令牌。服务端按当前账号、角色、数据范围和 Token 版本校验。
+    providerHmac:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: 外部服务回调使用 HMAC 签名，并同时校验 X-Provider-Code、X-Request-Id、X-Timestamp。
+  parameters:
+    PageNo:
+      name: pageNo
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Keyword:
+      name: keyword
+      in: query
+      schema: { type: string, maxLength: 100 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 写操作唯一键。相同键且相同请求返回首次结果；相同键但请求不同返回 IDEMPOTENCY_CONFLICT。
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    IfMatchVersion:
+      name: If-Match-Version
+      in: header
+      required: true
+      description: 乐观锁版本号；与请求体 version 二选一时以请求头优先。
+      schema: { type: integer, minimum: 1 }
+  responses:
+    Ok:
+      description: 请求成功
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example: { code: OK, message: 成功, requestId: req_20260903_001, data: {} }
+    AdminLoginOk:
+      description: 后台登录或刷新会话成功
+      content: { application/json: { schema: { $ref: '#/components/schemas/AdminLoginResponse' } } }
+    AdminMeOk:
+      description: 当前后台账号信息读取成功
+      content: { application/json: { schema: { $ref: '#/components/schemas/AdminMeResponse' } } }
+    Unauthorized:
+      description: 未登录、令牌失效或会话已被撤销
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: AUTH_TOKEN_EXPIRED, message: 登录状态已失效, requestId: req_001 } } }
+    Forbidden:
+      description: 角色、数据范围或对象归属不足
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: AUTH_FORBIDDEN, message: 无权操作该对象, requestId: req_001 } } }
+    NotFound:
+      description: 对象不存在；无权访问时返回 AUTH_FORBIDDEN，不暴露资源存在性
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: FILE_NOT_FOUND, message: 文件不存在或不可用, data: { resourceType: FILE, field: coverFileId }, requestId: req_001 } } }
+    ValidationError:
+      description: 参数校验失败
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: VALIDATION_REQUIRED, message: 参数校验失败, requestId: req_001, fieldErrors: [{ field: ipName, message: 不能为空 }] } } }
+    StateConflict:
+      description: 当前业务状态不允许操作、乐观锁、幂等或唯一资源冲突
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: STATE_TRANSITION_NOT_ALLOWED, message: 当前状态不允许该操作, data: { currentStatus: LISTED, action: SUBMIT_IP, reasonCode: IP_STATUS_NOT_EDITABLE }, requestId: req_001 } } }
+    ExternalUnavailable:
+      description: 外部存证服务不可用或尚未返回成功回执，IP 不会进入已确权状态
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { code: EVIDENCE_NOT_CONFIRMED, message: 存证服务尚未确认, requestId: req_001 } } }
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: { type: string, example: OK }
+        message: { type: string, example: 成功 }
+        requestId: { type: string, example: req_20260903_001 }
+        timestamp: { type: string, format: date-time }
+        data: { type: object, nullable: true, additionalProperties: true }
+    ErrorResponse:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: { type: string, example: AUTH_FORBIDDEN }
+        message: { type: string, example: 无权操作该对象 }
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+        data: { type: object, nullable: true, additionalProperties: true }
+        fieldErrors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+    PageResult:
+      type: object
+      required: [items, pageNo, pageSize, total, totalPages]
+      properties:
+        items: { type: array, items: {} }
+        pageNo: { type: integer, example: 1 }
+        pageSize: { type: integer, example: 20 }
+        total: { type: integer, example: 0 }
+        totalPages: { type: integer, example: 0 }
+    EmptyData:
+      type: object
+      additionalProperties: false
+    IdVersion:
+      type: object
+      required: [version]
+      properties: { version: { type: integer, minimum: 1 } }
+    FileIdList:
+      type: array
+      items: { type: string, description: file_object.file_id }
+    Reference:
+      type: object
+      properties:
+        id: { type: string }
+        no: { type: string }
+        name: { type: string }
+        status: { type: string }
+        statusName: { type: string }
+    SessionTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string, description: 建议仅作为 HttpOnly Secure Cookie 返回；文档保留兼容字段。 }
+        expiresIn: { type: integer, example: 7200 }
+        tokenType: { type: string, example: Bearer }
+    AdminLoginData:
+      allOf:
+        - $ref: '#/components/schemas/SessionTokens'
+        - type: object
+          required: [tokenType, user, mustChangePassword]
+          properties:
+            user: { $ref: '#/components/schemas/AdminCurrentUser' }
+            mustChangePassword: { type: boolean, description: 首次登录或管理员重置密码后为 true；为 true 时必须先调用密码修改接口。 }
+    AdminCurrentUser:
+      type: object
+      required: [id, username, displayName, orgId, dataScope, dataScopeName]
+      properties:
+        id: { type: string, example: '10401' }
+        username: { type: string }
+        displayName: { type: string }
+        orgId: { type: string, example: '10001' }
+        dataScope: { type: string, enum: [ALL, CITY, ORG, SELF] }
+        dataScopeName: { type: string, example: 仅本人 }
+    AdminRole:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, example: PLATFORM_ADMIN }
+        name: { type: string, example: 平台管理员 }
+    AdminMenu:
+      type: object
+      required: [code, name, resourceCode]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        resourceCode: { type: string }
+    AdminMeData:
+      type: object
+      required: [user, roles, menus, permissions]
+      properties:
+        user: { $ref: '#/components/schemas/AdminCurrentUser' }
+        roles: { type: array, items: { $ref: '#/components/schemas/AdminRole' } }
+        menus: { type: array, items: { $ref: '#/components/schemas/AdminMenu' } }
+        permissions: { type: array, items: { type: string } }
+    AdminLoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminLoginData' }
+    AdminMeResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminMeData' }
+    StatusResult:
+      type: object
+      required: [id, status, version, availableActions]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        statusName: { type: string }
+        version: { type: integer }
+        availableActions: { type: array, items: { type: string } }
+        statusChangedAt: { type: string, format: date-time }
+    FileUploadResponse:
+      type: object
+      required: [id, fileNo, originalName, mimeType, fileSize, fileHash, securityLevel, uploadStatus]
+      properties:
+        id: { type: string }
+        fileNo: { type: string }
+        originalName: { type: string }
+        mimeType: { type: string }
+        fileSize: { type: integer, format: int64 }
+        fileHash: { type: string, description: SHA-256 十六进制摘要 }
+        securityLevel: { type: string, enum: [PRIVATE] }
+        uploadStatus: { type: string, enum: [SUCCESS, FAILED] }
+    DownloadUrlResponse:
+      type: object
+      required: [downloadUrl, expiresAt]
+      properties:
+        downloadUrl: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
+    PaymentRequest:
+      type: object
+      required: [bizType, bizOrderId]
+      properties:
+        bizType: { type: string, enum: [AUTH_ORDER, PRODUCT_ORDER, ACTIVITY_BOOKING] }
+        bizOrderId: { type: string }
+        idempotencyKey: { type: string, description: 兼容字段；以 Idempotency-Key 请求头为准。 }
+    AuthOrderMockPayRequest:
+      type: object
+      required: [bizType, bizOrderId]
+      properties:
+        bizType: { type: string, enum: [AUTH_ORDER] }
+        bizOrderId: { type: string, description: 授权订单 ID }
+    AuthOrderMockPayResult:
+      type: object
+      required: [authOrderId, paymentStatus, authorizationId, contractStatus, evidenceStatus]
+      properties:
+        authOrderId: { type: string }
+        paymentStatus: { type: string, enum: [SUCCESS] }
+        authorizationId: { type: string }
+        contractStatus: { type: string, enum: [PENDING_GENERATION, PROCESSING, GENERATED, GENERATION_FAILED] }
+        evidenceStatus: { type: string, enum: [PENDING_EVIDENCE, EVIDENCE_RETRYING, EVIDENCED, EVIDENCE_FAILED] }
+    CreatorAuthorizationSummary:
+      type: object
+      properties:
+        id: { type: string }
+        authorizationNo: { type: string }
+        status: { type: string, enum: [ACTIVE, EXPIRED, TERMINATED] }
+        authorizationMode: { type: string }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        authOrderId: { type: string }
+        authOrderNo: { type: string }
+        amount: { type: string }
+        currency: { type: string, example: CNY }
+        paidAt: { type: string, format: date-time, nullable: true }
+        contract: { type: object, properties: { status: { type: string }, contractNo: { type: string }, downloadReady: { type: boolean }, downloadPath: { type: string }, fileHash: { type: string } } }
+        certificate: { type: object, properties: { certificateNo: { type: string }, downloadReady: { type: boolean }, downloadPath: { type: string } } }
+        evidence: { type: object, properties: { status: { type: string }, receiptNo: { type: string }, transactionHash: { type: string } } }
+    PaymentResult:
+      type: object
+      properties:
+        paymentNo: { type: string }
+        paymentProvider: { type: string, example: WECHAT_PAY_V3 }
+        h5Url: { type: string, format: uri, description: 微信支付 H5 收银台跳转地址；仅待支付时返回。 }
+        paymentStatus: { type: string, enum: [PENDING, SUCCESS, FAILED, PROCESSING] }
+        bizOrder: { $ref: '#/components/schemas/StatusResult' }
+    ErrorCode:
+      type: string
+      enum:
+        - OK
+        - AUTH_CAPTCHA_INVALID
+        - AUTH_SMS_CODE_INVALID
+        - AUTH_TOKEN_EXPIRED
+        - AUTH_TOKEN_REVOKED
+        - AUTH_FORBIDDEN
+        - VALIDATION_REQUIRED
+        - VALIDATION_FORMAT_INVALID
+        - RESOURCE_NOT_FOUND
+        - IP_NOT_FOUND
+        - FILE_NOT_FOUND
+        - COVER_FILE_NOT_FOUND
+        - RIGHT_DOCUMENT_FILE_NOT_FOUND
+        - DETAIL_FILE_NOT_FOUND
+        - DCI_CERTIFICATE_FILE_NOT_FOUND
+        - EVALUATION_REPORT_FILE_NOT_FOUND
+        - AUTH_PLAN_NOT_FOUND
+        - AUTH_PLAN_VERSION_NOT_FOUND
+        - DISTRIBUTION_PLAN_NOT_FOUND
+        - DCI_ASSISTANCE_REQUEST_NOT_FOUND
+        - CREATOR_NOT_FOUND
+        - IDENTITY_VERIFICATION_NOT_FOUND
+        - AUTHORIZATION_LETTER_FILE_NOT_FOUND
+        - REGION_NOT_FOUND
+        - TAG_NOT_FOUND
+        - SYSTEM_CONFIG_NOT_FOUND
+        - AFTER_SALE_TEMPLATE_NOT_FOUND
+        - ACCOUNT_NOT_FOUND
+        - ORGANIZATION_NOT_FOUND
+        - AUTH_ORDER_NOT_FOUND
+        - RESOURCE_CONFLICT
+        - VERSION_CONFLICT
+        - IDEMPOTENCY_CONFLICT
+        - STATE_TRANSITION_NOT_ALLOWED
+        - IDENTITY_NOT_VERIFIED
+        - AUTHORIZATION_EXPIRED
+        - AUTH_PLAN_BOUND_LOCKED
+        - IP_DCI_CERTIFICATE_REQUIRED
+        - IP_DCI_CERTIFICATE_NOT_VERIFIED
+        - QUOTA_INSUFFICIENT
+        - STOCK_INSUFFICIENT
+        - CONTENT_DETECTION_BLOCKED
+        - PROVIDER_CALLBACK_INVALID
+        - EVIDENCE_RECEIPT_MISSING
+        - PAYMENT_STATUS_INVALID
+        - REFUND_NOT_ALLOWED
+        - SETTLEMENT_ITEM_INELIGIBLE
+        - RATE_LIMITED
+    AdminLoginRequest:
+      type: object
+      required: [username, password, captchaId, captchaCode]
+      properties:
+        username: { type: string, minLength: 2, maxLength: 50, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,48}[A-Za-z0-9]$', description: 仅英文字母、数字、下划线和连字符；首尾必须为字母或数字。 }
+        password: { type: string, format: password, minLength: 8, maxLength: 64 }
+        captchaId: { type: string }
+        captchaCode: { type: string, minLength: 4, maxLength: 8 }
+    UnifiedLoginRequest:
+      type: object
+      required: [account, password, captchaId, captchaCode]
+      properties:
+        account: { type: string, minLength: 2, maxLength: 50 }
+        password: { type: string, format: password, minLength: 8, maxLength: 64 }
+        captchaId: { type: string, description: 所有后台角色必填；先由 GET /auth/captcha 获取。 }
+        captchaCode: { type: string, minLength: 4, maxLength: 8, description: 所有后台角色必填。 }
+    PasswordChangeRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword: { type: string, format: password, minLength: 8, maxLength: 64, writeOnly: true }
+        newPassword: { type: string, format: password, minLength: 8, maxLength: 64, writeOnly: true, description: 必须包含大写字母、小写字母、数字和特殊字符，且不得包含空白字符。 }
+    PasswordResetByAdminRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword: { type: string, format: password, minLength: 8, maxLength: 64, writeOnly: true, description: 设置为临时密码；目标账号下次登录必须修改。 }
+    PasswordResetSMSRequest:
+      type: object
+      required: [mobile]
+      properties:
+        mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }
+    PasswordResetRequest:
+      type: object
+      required: [mobile, smsCode, newPassword]
+      properties:
+        mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }
+        smsCode: { type: string, minLength: 6, maxLength: 6, writeOnly: true }
+        newPassword: { type: string, format: password, minLength: 8, maxLength: 64, writeOnly: true, description: 必须包含大写字母、小写字母、数字和特殊字符，且不得包含空白字符。 }
+    AdminAccountCreateRequest:
+      type: object
+      required: [username, initialPassword, displayName, orgId, roleCode, dataScope]
+      properties:
+        username: { type: string, minLength: 2, maxLength: 50, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,48}[A-Za-z0-9]$' }
+        initialPassword: { type: string, format: password, minLength: 8, maxLength: 64, writeOnly: true }
+        displayName: { type: string, minLength: 1, maxLength: 128 }
+        mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }
+        orgId: { type: string }
+        roleCode: { type: string, enum: [PLATFORM_ADMIN, GROUP_MANAGER, CITY_OPERATOR, COPYRIGHT_COMPLIANCE, CREATOR, FINANCE, FULFILLMENT_CUSTOMER_SERVICE] }
+        dataScope: { type: string, enum: [ALL, CITY, ORG, SELF] }
+    AdminAccountUpdateRequest:
+      type: object
+      required: [displayName, orgId, roleCode, dataScope]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 128 }
+        mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }
+        orgId: { type: string }
+        roleCode: { type: string, enum: [PLATFORM_ADMIN, GROUP_MANAGER, CITY_OPERATOR, COPYRIGHT_COMPLIANCE, CREATOR, FINANCE, FULFILLMENT_CUSTOMER_SERVICE] }
+        dataScope: { type: string, enum: [ALL, CITY, ORG, SELF] }
+    AdminAccountStatusRequest:
+      type: object
+      required: [status, reason]
+      properties:
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    OrgCreateRequest:
+      type: object
+      required: [orgCode, orgName, orgType]
+      properties:
+        orgCode: { type: string, minLength: 2, maxLength: 64, description: 组织唯一编码，创建后不可修改 }
+        orgName: { type: string, minLength: 1, maxLength: 128 }
+        orgType: { type: string, enum: [GROUP, PLATFORM, CITY] }
+        parentId: { type: string, nullable: true }
+        cityCode: { type: string, nullable: true, maxLength: 32, description: CITY 类型必填，其他类型不得填写 }
+    OrgUpdateRequest:
+      type: object
+      required: [orgName]
+      properties:
+        orgName: { type: string, minLength: 1, maxLength: 128 }
+        parentId: { type: string, nullable: true }
+        cityCode: { type: string, nullable: true, maxLength: 32 }
+    OrgStatusRequest:
+      type: object
+      required: [status, reason]
+      properties:
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    MobileCodeRequest:
+      type: object
+      required: [mobile, smsCode]
+      properties: { mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }, smsCode: { type: string, minLength: 4, maxLength: 8 } }
+    ConsumerSmsRequest:
+      type: object
+      required: [mobile]
+      properties: { mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' } }
+    ConsumerLoginRequest:
+      allOf:
+        - $ref: '#/components/schemas/MobileCodeRequest'
+        - type: object
+          required: [agreementAccepted, agreementVersion]
+          properties: { agreementAccepted: { type: boolean, enum: [true] }, agreementVersion: { type: string, maxLength: 64 } }
+    CreatorSmsRequest:
+      type: object
+      required: [mobile]
+      properties: { mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' } }
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties: { refreshToken: { type: string } }
+    TagRequest:
+      type: object
+      required: [tagType, tagName]
+      properties: { tagType: { type: string, enum: [REGION, CULTURE, CATEGORY, COMMERCIAL] }, tagName: { type: string, maxLength: 128 }, sortNo: { type: integer, minimum: 0, maximum: 999999, default: 0 } }
+    RegionRequest:
+      type: object
+      required: [regionCode, regionName, enabled]
+      properties: { regionCode: { type: string, pattern: '^(000000|[1-9][0-9]{5})$' }, regionName: { type: string, maxLength: 128 }, sortNo: { type: integer, minimum: 0, maximum: 999999, default: 0 }, enabled: { type: boolean } }
+    EnabledChangeRequest:
+      type: object
+      required: [enabled, reason]
+      properties: { enabled: { type: boolean }, reason: { type: string, maxLength: 500 } }
+    ConfigUpdateRequest:
+      type: object
+      required: [value, reason]
+      properties: { value: { type: string, maxLength: 4000 }, reason: { type: string, maxLength: 500 } }
+    TemplateCreateRequest:
+      type: object
+      required: [templateNo, templateName, bizType, conditions, refundRule]
+      properties: { templateNo: { type: string, minLength: 2, maxLength: 64 }, templateName: { type: string, maxLength: 200 }, bizType: { type: string, enum: [PRODUCT, ACTIVITY] }, conditions: { type: object, additionalProperties: true }, refundRule: { type: object, additionalProperties: true }, returnFeeBearer: { type: string, enum: [CREATOR_PLATFORM, CONSUMER] } }
+    TemplateVersionRequest:
+      type: object
+      required: [templateName, conditions, refundRule]
+      properties: { templateName: { type: string, maxLength: 200 }, conditions: { type: object, additionalProperties: true }, refundRule: { type: object, additionalProperties: true }, returnFeeBearer: { type: string, enum: [CREATOR_PLATFORM, CONSUMER] } }
+    StatusChangeRequest:
+      type: object
+      required: [status, reason]
+      properties: { status: { type: string }, enabled: { type: boolean }, reason: { type: string, maxLength: 500 } }
+    FileReferenceRequest:
+      type: object
+      required: [fileId]
+      properties: { fileId: { type: string } }
+    CommentRequest:
+      type: object
+      properties: { comment: { type: string, maxLength: 1000 }, reason: { type: string, maxLength: 1000 }, submitComment: { type: string, maxLength: 1000 } }
+    ReviewRequest:
+      type: object
+      required: [result, comment]
+      properties: { result: { type: string, enum: [CONFIRMED, RETURNED, PASS, RETURN, REJECT] }, comment: { type: string, maxLength: 1000 }, supplementItems: { type: array, items: { type: string } } }
+    CreatorRegisterRequest:
+      type: object
+      required: [mobile, password, smsCode, displayName]
+      properties:
+        mobile: { type: string, pattern: '^1[3-9][0-9]{9}$' }
+        password: { type: string, format: password, minLength: 8, maxLength: 64 }
+        smsCode: { type: string }
+        displayName: { type: string, minLength: 2, maxLength: 128 }
+    IdentityVerificationRequest:
+      type: object
+      required: [subjectType, legalName, credentialType, credentialNo]
+      description: 证件号、统一社会信用代码等敏感字段仅 HTTPS 传输并加密存储，不在响应或审计原文中返回。
+      properties: { subjectType: { type: string, enum: [PERSONAL, ENTERPRISE, STUDIO] }, legalName: { type: string }, credentialType: { type: string }, credentialNo: { type: string, writeOnly: true } }
+    IpCreateRequest:
+      type: object
+      required: [ipName, ipType, sourceType, mainCityOrgId, shortIntro, detailContent, cultureStory, ipFeature, creativeDirections, applicableProductTypes, applicableActivityTypes, publicCopyrightNotice, purchaseNotice, suggestedTransactionPriceAmount, coverFileId, rightHolder, rightDocuments, materialPack, authPlanVersionId, distributionTemplateId, distributionItems]
+      properties:
+        ipName: { type: string, maxLength: 100 }
+        ipType: { type: string }
+        sourceType: { type: string }
+        mainCityOrgId: { type: string, description: 主归属城市组织 ID；前端通过 GET /admin/orgs/options 获取，仅可选择 status=ACTIVE 且 orgType=CITY 的组织。 }
+        shortIntro: { type: string, maxLength: 500, description: 一句话简介 }
+        detailContent: { type: string, maxLength: 20000, description: 完整介绍 }
+        cultureStory: { type: string, maxLength: 20000, description: 文化背景和故事 }
+        ipFeature: { type: string, maxLength: 5000, description: IP特色 }
+        creativeDirections: { type: array, minItems: 1, items: { type: string, maxLength: 200 } }
+        applicableProductTypes: { type: array, minItems: 1, items: { type: string } }
+        applicableActivityTypes: { type: array, minItems: 1, items: { type: string } }
+        regionTagCodes: { type: array, items: { type: string } }
+        cultureTagCodes: { type: array, items: { type: string } }
+        categoryTagCodes: { type: array, items: { type: string } }
+        commercializationTagCodes: { type: array, items: { type: string } }
+        publicCopyrightNotice: { type: string, maxLength: 5000 }
+        purchaseNotice: { type: string, maxLength: 5000 }
+        suggestedTransactionPriceAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$', description: IP建议交易价；确权确认时锁定 }
+        coverFileId: { type: string, description: 封面图；提交审核时按展示规则必填 }
+        detailFileIds: { $ref: '#/components/schemas/FileIdList' }
+        rightHolder: { type: object, required: [holderType, holderName, acquisitionMethod, rightsDescription], properties: { holderType: { type: string, enum: [PERSONAL, ENTERPRISE, INSTITUTION, COLLECTIVE] }, holderName: { type: string }, acquisitionMethod: { type: string, enum: [ORIGINAL_CREATION, TRANSFER, LICENSE, INHERITANCE, ENTRUSTED_MANAGEMENT, OTHER] }, rightsDescription: { type: string, maxLength: 10000 } } }
+        rightDocuments: { type: array, minItems: 1, items: { type: object, required: [documentType, documentNo, fileId], properties: { documentType: { type: string }, documentNo: { type: string, maxLength: 128 }, validFrom: { type: string, format: date }, validTo: { type: string, format: date }, fileId: { type: string } } } }
+        materialPack: { $ref: '#/components/schemas/MaterialPackInput' }
+        dciCertificateNo: { type: string, maxLength: 128, description: DCI 版权证书编号；提交审核时必填 }
+        dciCertificateFileId: { type: string, description: DCI 版权证书文件；提交审核时必填 }
+        dciAssistanceRequested: { type: boolean, default: false, description: 是否在保存 IP 时一并申请 DCI 代办；为 true 时必须传 dciAssistanceRequest，且不得传 dciCertificateNo 或 dciCertificateFileId。 }
+        dciAssistanceRequest: { $ref: '#/components/schemas/DciAssistanceRequest' }
+        authPlanVersionId: { type: string }
+        distributionTemplateId: { type: string }
+        distributionItems: { type: array, minItems: 1, description: 模板全部参与方均必填；比例为0至1小数且合计1.000000, items: { type: object, required: [participantType, ratio], properties: { participantType: { type: string }, ratio: { type: string, pattern: '^0(\\.\\d+)?$|^1(\\.0+)?$' } } } }
+    DciVerificationRequest:
+      type: object
+      required: [result, comment]
+      properties: { result: { type: string, enum: [PASS, RETURN] }, comment: { type: string, maxLength: 500 } }
+    RightsReviewRequest:
+      type: object
+      required: [result, comment]
+      properties:
+        result: { type: string, enum: [CONFIRM, RETURN] }
+        comment: { type: string, maxLength: 500 }
+        supplementItems: { type: array, items: { type: string, maxLength: 200 } }
+        authPlanVersionId: { type: string, description: 确权时必填 }
+        distributionTemplateId: { type: string, description: 确权时必填 }
+        suggestedTransactionPriceAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$', description: CONFIRM时必填；确权后锁定 }
+        distributionItems: { type: array, description: 确权时必须覆盖模板全部参与方且比例合计1.000000, items: { type: object, required: [participantType, ratio], properties: { participantType: { type: string }, ratio: { type: string } } } }
+    DciAssistanceRequest:
+      type: object
+      required: [contactName, contactMobile]
+      properties: { contactName: { type: string, writeOnly: true, maxLength: 100 }, contactMobile: { type: string, writeOnly: true, maxLength: 32 }, preferredContactTime: { type: string, maxLength: 100 }, requestNote: { type: string, maxLength: 500 } }
+    DciCertificateSubmitRequest:
+      type: object
+      required: [certificateNo, certificateFileId]
+      properties: { certificateNo: { type: string, maxLength: 128 }, certificateFileId: { type: string } }
+    MaterialPackInput:
+      type: object
+      required: [packName, items]
+      properties:
+        packName: { type: string, maxLength: 200 }
+        scopeDescription: { type: string, maxLength: 5000 }
+        items: { type: array, minItems: 1, maxItems: 200, items: { type: object, required: [fileId, materialRole], properties: { fileId: { type: string }, materialRole: { type: string, maxLength: 40 }, sortNo: { type: integer, minimum: 0 }, deliverable: { type: boolean, default: true }, scopeDescription: { type: string, maxLength: 2000 } } } }
+    DciAssistanceHandleRequest:
+      type: object
+      required: [handlingStatus, handlingNote]
+      properties: { handlingStatus: { type: string, enum: [CONTACTED, PROCESSING, COMPLETED, CLOSED] }, handlingNote: { type: string, maxLength: 500 } }
+    EvaluationReportRequest:
+      type: object
+      required: [reportNo, institutionName, reportDate, fileId]
+      properties: { reportNo: { type: string }, institutionName: { type: string }, reportDate: { type: string, format: date }, validTo: { type: string, format: date }, fileId: { type: string }, evaluationSuggestedPriceAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$', description: 非必填评估建议价格；仅作参考 } }
+    AuthPlanRequest:
+      type: object
+      required: [planNo, planName, authorizationMode, termType, regionMode, scenes, contentType]
+      properties: { planNo: { type: string, maxLength: 64 }, planName: { type: string, maxLength: 200 }, authorizationMode: { type: string, enum: [NORMAL_SHARE, EXCLUSIVE_BUYOUT] }, termType: { type: string, enum: [MONTH, YEAR, DATE_RANGE] }, termValue: { type: integer, minimum: 1, description: 按月或按年授权必填；指定日期时不传 }, validFrom: { type: string, format: date, description: 指定日期授权必填 }, validTo: { type: string, format: date, description: 指定日期授权必填且不得早于 validFrom }, regionMode: { type: string, enum: [NATIONWIDE, DESIGNATED] }, regionCodes: { type: array, description: 指定地区授权必填；全国授权不传, items: { type: string, pattern: '^[0-9]{6}$' } }, scenes: { type: array, minItems: 1, items: { type: string, enum: [PRODUCT_SALE, ACTIVITY, PROMOTION, ONLINE_CONTENT, OFFLINE_MATERIAL] } }, commercialAllowed: { type: boolean }, derivativeAllowed: { type: boolean }, nCreationAllowed: { type: boolean }, contentType: { type: string, enum: [PRODUCT_ONLY, ACTIVITY_ONLY, PRODUCT_AND_ACTIVITY] }, quotaTotal: { type: integer, minimum: 1, nullable: true, description: 普通授权不传或传 null 表示不限额；独家买断必须为 1 } }
+    AuthPlanUpdateRequest:
+      type: object
+      required: [planName, authorizationMode, termType, regionMode, scenes, contentType]
+      properties: { planName: { type: string, maxLength: 200 }, authorizationMode: { type: string, enum: [NORMAL_SHARE, EXCLUSIVE_BUYOUT] }, termType: { type: string, enum: [MONTH, YEAR, DATE_RANGE] }, termValue: { type: integer, minimum: 1, description: 按月或按年授权必填；指定日期时不传 }, validFrom: { type: string, format: date, description: 指定日期授权必填 }, validTo: { type: string, format: date, description: 指定日期授权必填且不得早于 validFrom }, regionMode: { type: string, enum: [NATIONWIDE, DESIGNATED] }, regionCodes: { type: array, description: 指定地区授权必填；全国授权不传, items: { type: string, pattern: '^[0-9]{6}$' } }, scenes: { type: array, minItems: 1, items: { type: string, enum: [PRODUCT_SALE, ACTIVITY, PROMOTION, ONLINE_CONTENT, OFFLINE_MATERIAL] } }, commercialAllowed: { type: boolean }, derivativeAllowed: { type: boolean }, nCreationAllowed: { type: boolean }, contentType: { type: string, enum: [PRODUCT_ONLY, ACTIVITY_ONLY, PRODUCT_AND_ACTIVITY] }, quotaTotal: { type: integer, minimum: 1, nullable: true, description: 普通授权不传或传 null 表示不限额；独家买断必须为 1 } }
+    DistributionTemplateRequest:
+      type: object
+      required: [distributionNo, distributionName, distributionType, items]
+      properties: { distributionNo: { type: string, maxLength: 64 }, distributionName: { type: string, maxLength: 200 }, distributionType: { type: string, enum: [NORMAL_SHARE, BUYOUT_FEE] }, items: { type: array, minItems: 1, items: { type: object, required: [participantType], properties: { participantType: { type: string }, sortNo: { type: integer, minimum: 0 } } } } }
+    DistributionTemplateUpdateRequest:
+      type: object
+      required: [distributionName, items]
+      properties: { distributionName: { type: string, maxLength: 200 }, items: { type: array, minItems: 1, items: { type: object, required: [participantType], properties: { participantType: { type: string }, sortNo: { type: integer, minimum: 0 } } } } }
+    AuthOrderCreateRequest:
+      type: object
+      required: [ipId, contractAgreed]
+      properties: { ipId: { type: string }, contractAgreed: { type: boolean, enum: [true] } }
+    AuthOrderCancelRequest:
+      type: object
+      properties: { reason: { type: string, maxLength: 500 } }
+    MaterialDownloadRequest:
+      type: object
+      required: [materialItemId]
+      properties: { materialItemId: { type: string, description: 冻结素材包明细 ID；服务端按授权订单的素材清单 Hash 校验，不接受 fileId 直传。 } }
+    WorkSubmitRequest:
+      type: object
+      required: [workName, workType, creationDescription, copyrightDeclaration, authorizationId, declarations, newExpressionRatio, newExpressionDimensions, newExpressionDescription, originalIPUsageDescription, previewFileIds, sourceFileIds, materialItemIds]
+      properties:
+        workName: { type: string, maxLength: 200 }
+        workType: { type: string, enum: [IMAGE, VIDEO, GRAPHIC_DESIGN, ARTICLE, MUSIC_AUDIO, OTHER] }
+        workIntro: { type: string, maxLength: 2000 }
+        creationDescription: { type: string, maxLength: 5000 }
+        completedAt: { type: string, format: date-time }
+        publicCopyrightNotice: { type: string, maxLength: 2000 }
+        copyrightDeclaration: { type: string, maxLength: 2000 }
+        authorizationId: { type: string }
+        declarations: { type: object, required: [SELF_CREATED, AUTHORIZED_IP_MATERIAL, NO_UNAUTHORIZED_THIRD_PARTY, NO_THIRD_PARTY_RIGHTS_INFRINGEMENT, AUTHENTIC_AND_LAWFUL], additionalProperties: { type: boolean } }
+        aiAssisted: { type: boolean }
+        aiAssistanceDescription: { type: string }
+        coCreatorDescription: { type: string }
+        newExpressionRatio: { type: integer, minimum: 51, maximum: 100, description: 平台确权准入自评比例，不是法定版权比例 }
+        newExpressionDimensions: { type: array, minItems: 1, items: { type: string } }
+        newExpressionDescription: { type: string }
+        originalIPUsageDescription: { type: string }
+        previewFileIds: { $ref: '#/components/schemas/FileIdList' }
+        sourceFileIds: { $ref: '#/components/schemas/FileIdList' }
+        processFileIds: { $ref: '#/components/schemas/FileIdList' }
+        materialItemIds: { type: array, minItems: 1, items: { type: string } }
+    WorkReviewRequest:
+      type: object
+      required: [reviewNode, result]
+      properties: { reviewNode: { type: string, enum: [COPYRIGHT_INITIAL, COMPLIANCE_REVIEW] }, result: { type: string, enum: [PASS, RETURN, REJECT] }, comment: { type: string }, supplementItems: { type: string } }
+    WorkRightsConfirmationRequest:
+      type: object
+      required: [reviewedNewExpressionRatio]
+      properties: { reviewedNewExpressionRatio: { type: integer, minimum: 51, maximum: 100, description: 平台内部准入认定，不改变原始IP权属 }, comment: { type: string } }
+    ProductCreateRequest:
+      type: object
+      required: [authorizationId, workId, productName, productType, coverFileId, publicCopyrightNotice, saleRegionMode, fulfillmentMode, freightMode, afterSaleTemplateId, skus]
+      properties:
+        authorizationId: { type: string }
+        workId: { type: string }
+        productName: { type: string, maxLength: 100 }
+        productIntro: { type: string, maxLength: 2000 }
+        productType: { type: string }
+        brand: { type: string, maxLength: 200 }
+        manufacturer: { type: string, maxLength: 200 }
+        barcode: { type: string, maxLength: 128 }
+        taxRate: { type: string, pattern: '^\\d+(\\.\\d{1,4})?$' }
+        coverFileId: { type: string }
+        detailFileIds: { $ref: '#/components/schemas/FileIdList' }
+        attachments: { type: array, description: 可选商品视频、说明书、质检报告、生产许可证或其他附件, items: { type: object, required: [fileId, fileType], properties: { fileId: { type: string }, fileType: { type: string, enum: [PRODUCT_VIDEO, MANUAL, QUALITY_REPORT, PRODUCTION_LICENSE, OTHER] } } } }
+        publicCopyrightNotice: { type: string, maxLength: 1000 }
+        saleRegionMode: { type: string, enum: [NATIONAL, SPECIFIED] }
+        saleRegionCodes: { type: array, items: { type: string } }
+        fulfillmentMode: { type: string, enum: [CREATOR_SHIP, PLATFORM_SHIP] }
+        freightMode: { type: string, enum: [FREE, FIXED] }
+        freightAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }
+        afterSaleTemplateId: { type: string }
+        skus:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [skuName, salePrice, stockTotal]
+            properties: { skuCode: { type: string, readOnly: true, description: 后端按 SKU-IP资产编号-关联作品编号-商品编号末6位-顺序号 自动生成 }, skuName: { type: string }, spec: { type: object, additionalProperties: { type: string } }, salePrice: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }, stockTotal: { type: integer, minimum: 0 }, skuFileId: { type: string } }
+    ProductReviewRequest:
+      type: object
+      required: [reviewNode, result]
+      properties: { reviewNode: { type: string, enum: [COPYRIGHT_INITIAL, COMPLIANCE_REVIEW] }, result: { type: string, enum: [PASS, RETURN, REJECT] }, comment: { type: string }, supplementItems: { type: string } }
+    ActivityCreateRequest:
+      type: object
+      required: [authorizationId, activityName, coverFileId, venueName, mapPointName, longitude, latitude, actualCityCode, publicCopyrightNotice, refundTemplateId, sessions]
+      properties:
+        authorizationId: { type: string }
+        activityName: { type: string, maxLength: 100 }
+        activityIntro: { type: string, maxLength: 2000 }
+        coverFileId: { type: string }
+        venueName: { type: string }
+        mapPointName: { type: string }
+        longitude: { type: string }
+        latitude: { type: string }
+        actualCityCode: { type: string, description: 实际举办城市编码，禁止使用全国编码 }
+        notice: { type: string, maxLength: 2000 }
+        publicCopyrightNotice: { type: string, maxLength: 1000 }
+        refundTemplateId: { type: string }
+        sessions: { type: array, minItems: 1, items: { type: object, required: [sessionNo, sessionName, startAt, endAt, quotaTotal, tickets], properties: { sessionNo: { type: string }, sessionName: { type: string }, startAt: { type: string, format: date-time }, endAt: { type: string, format: date-time }, quotaTotal: { type: integer, minimum: 1 }, tickets: { type: array, minItems: 1, items: { type: object, required: [ticketTypeCode, chargeType, price, quotaTotal], properties: { ticketTypeCode: { type: string, description: 取值来自 GET /dictionaries/ACTIVITY_TICKET_TYPE }, chargeType: { type: string, enum: [FREE, PAID] }, price: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }, quotaTotal: { type: integer, minimum: 1 } } } } } } }
+    ProductOrderRequest:
+      type: object
+      required: [items, addressId]
+      properties:
+        addressId: { type: string }
+        items: { type: array, minItems: 1, items: { type: object, required: [skuId, quantity], properties: { skuId: { type: string }, quantity: { type: integer, minimum: 1, maximum: 99 } } } }
+    ConsumerAddressRequest:
+      type: object
+      required: [recipientName, mobile, provinceCode, cityCode, districtCode, detailAddress]
+      properties: { recipientName: { type: string, maxLength: 100 }, mobile: { type: string, maxLength: 32 }, provinceCode: { type: string }, cityCode: { type: string }, districtCode: { type: string }, detailAddress: { type: string, maxLength: 500 }, postalCode: { type: string, maxLength: 32 }, isDefault: { type: boolean } }
+    ProductOrderMockPayRequest:
+      type: object
+      required: [outcome]
+      properties: { outcome: { type: string, enum: [SUCCESS, FAILURE] } }
+    ActivityBookingRequest:
+      type: object
+      required: [activityId, sessionId, ticketTypeId, quantity, rulesAgreed]
+      properties: { activityId: { type: string }, sessionId: { type: string }, ticketTypeId: { type: string }, quantity: { type: integer, minimum: 1 }, rulesAgreed: { type: boolean, enum: [true] } }
+    ShipmentRequest:
+      type: object
+      required: [carrierCode, trackingNo, shippedAt, packageCount]
+      properties: { carrierCode: { type: string }, trackingNo: { type: string }, shippedAt: { type: string, format: date-time }, packageCount: { type: integer, minimum: 1 }, proofFileId: { type: string }, remark: { type: string, maxLength: 500 } }
+    VerificationRequest:
+      type: object
+      required: [bookingId, displayCode, verificationPoint, result]
+      properties: { bookingId: { type: string }, displayCode: { type: string }, verificationPoint: { type: string }, result: { type: string, enum: [SUCCESS, EXCEPTION] }, exceptionType: { type: string }, exceptionComment: { type: string }, evidenceFileId: { type: string } }
+    ProductAfterSaleRequest:
+      type: object
+      required: [orderId, orderItemId, afterSaleType, reasonCode]
+      properties: { orderId: { type: string }, orderItemId: { type: string }, afterSaleType: { type: string, enum: [CANCEL_REFUND, RETURN_REFUND] }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 1000 }, evidenceFileIds: { $ref: '#/components/schemas/FileIdList' } }
+    ActivityAfterSaleRequest:
+      type: object
+      required: [bookingId, reasonCode]
+      properties: { bookingId: { type: string }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 1000 }, evidenceFileIds: { $ref: '#/components/schemas/FileIdList' } }
+    AfterSaleReviewRequest:
+      type: object
+      required: [result, comment]
+      properties: { result: { type: string }, comment: { type: string }, returnFeeBearer: { type: string }, suggestedRefundAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' } }
+    RefundReviewRequest:
+      type: object
+      required: [result, refundAmount, comment]
+      properties: { result: { type: string, enum: [APPROVE, REJECT] }, refundAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }, comment: { type: string } }
