@@ -77,7 +77,7 @@
 | API-H5-01 | H5 公开浏览与客服信息 | P0 | 8 | API-CNT-02、API-CNT-03 | 已完成：匿名商品/活动浏览、稳定公开展示图、暂停报名活动展示、客服信息及真实 MySQL HTTP 回归 |
 | API-H5-02 | 商品订单预览、库存预占与商品订单 | P0 | 8 | API-FND-01、API-CNT-02 | 待开发 |
 | API-H5-03 | 活动预约、免费票与核销码展示 | P0 | 6 | API-FND-01、API-CNT-03 | 待开发 |
-| API-FUL-01 | 发货、物流与签收回调 | P0 | 4 | API-H5-02、API-FND-05 | 待开发 |
+| API-FUL-01 | 发货、物流与签收回调 | P0 | 4 | API-H5-02、API-FND-05 | 开发中：物流查询 Adapter 已真实验证 |
 | API-FUL-02 | 现场核销与活动订单完成 | P0 | 3 | API-H5-03 | 待开发 |
 | API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 待开发 |
 | API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 待开发 |
@@ -146,13 +146,13 @@
 
 ### API-FND-05 外部服务适配器与安全回调框架
 
-- **当前阶段范围与状态：** 部分完成。只交付腾讯云文本内容安全真实 Adapter 和存证 Provider 框架；短信、实名、支付、电子签章、物流及其回调延后到对应业务模块开发。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
-- **接口范围：** 内部 `ContentSafetyProvider`（已完成，腾讯云 TMS `TextModeration`）与 `EvidenceProvider`（框架已完成，真实链服务商待确定）；存证回调 `POST /integrations/evidence/callbacks` 待链服务商确定签名规范后实现。
+- **当前阶段范围与状态：** 部分完成。已交付腾讯云文本内容安全真实 Adapter、存证 Provider 框架，以及供 API-FUL-01 调用的腾讯云云市场物流查询 Adapter；短信、支付、电子签章及物流回调仍在对应业务模块开发。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
+- **接口范围：** 内部 `ContentSafetyProvider`（已完成，腾讯云 TMS `TextModeration`）、`EvidenceProvider`（框架已完成，真实链服务商待确定）及 `LogisticsProvider.Query`（已完成，腾讯云云市场快递查询）；存证回调 `POST /integrations/evidence/callbacks` 和物流回调待对应服务商签名规范及业务路由确定后实现。
 - **主写表：** 后续 IP 业务调用时写 `content_detection_record`、`evidence_record`、`evidence_retry_log`；当前适配器本身不提供前端可调用路由，也不伪造业务记录。
 - **关联校验表：** `sys_config`、`file_object`、所有受检测/存证对象。
 - **异步/联动表：** `sys_audit_log`、存证失败重试队列（在 IP 确权模块接入）。
-- **核心实现：** 腾讯云 TMS 使用 `BizType=ip_center`、`ap-guangzhou` 和同步 `TextModeration`；`Pass` 映射为 `PASS`，`Review` 或未知建议映射为 `REVIEW`，`Block` 映射为 `BLOCK`。业务文本、命中词和密钥不写普通日志。存证只有收到真实服务的可验证回执且状态为 `SUCCESS` 才可推进业务状态。
-- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。
+- **核心实现：** 腾讯云 TMS 使用 `BizType=ip_center`、`ap-guangzhou` 和同步 `TextModeration`；`Pass` 映射为 `PASS`，`Review` 或未知建议映射为 `REVIEW`，`Block` 映射为 `BLOCK`。物流 Adapter 请求 `https://ap-guangzhou.cloudmarket-apigw.com/service-d2zdkymg/express/query`，使用 `code=auto`、`no`、`tel`（后四位）及云市场 HMAC-SHA1 `Authorization`；`code="0"` 为成功，`logisticsStatus="SIGN"` 为签收，轨迹时间为毫秒。物流密钥只从 `XINGYANSHU_LOGISTICS_SECRET_ID`、`XINGYANSHU_LOGISTICS_SECRET_KEY` 读取。业务文本、命中词、运单完整手机号和密钥不写普通日志。存证只有收到真实服务的可验证回执且状态为 `SUCCESS` 才可推进业务状态。
+- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；物流 Adapter 已使用真实圆通运单返回派送中状态和 9 条轨迹，且未记录密钥或完整个人信息；敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。
 
 ## 5. IP 与授权方案任务
 
@@ -301,7 +301,8 @@
 - **主写表：** `delivery_order`、`logistics_event`、`product_order`。
 - **关联校验表：** `product_order_item`、`product`、`creator_profile`、`sys_user`、`file_object`。
 - **异步/联动表：** `evidence_record`、`biz_status_history`、`sys_audit_log`、订单自动完成任务。
-- **核心实现：** 仅待发货订单可发货；创作者只能操作本人自行发货订单，平台统一发货由履约客服处理；物流回调 HMAC 验签和事件幂等，签收后更新订单。
+- **当前进度：** 已完成并真实验证底层 `LogisticsProvider.Query`；其余发货路由、轨迹落库、定时轮询、签收后 7 天自动确认和物流回调尚未注册，不能对前端宣称已可用。
+- **核心实现：** 仅待发货订单可发货；创作者只能操作本人自行发货订单，平台统一发货由履约客服处理；优先以已接入的后端轮询查询保存轨迹并推进签收，物流回调作为兼容入口同样执行验签和事件幂等；签收后 7 天无进行中售后自动确认收货。
 - **验收：** 重复回调不回退签收状态；收货地址仅按角色脱敏可见；发货后消费者可查询轨迹；发货凭证进入文件/存证链路。
 
 ### API-FUL-02 现场核销与活动订单完成
@@ -440,6 +441,19 @@
 → 履约客服现场核销
 → 自动分账与结算
 ```
+
+## 2026-10-29：API-H5-公共接口与订单契约修复（已实现）
+
+- `GET /public/regions` 的 `level` 统一归一为大写层级，兼容旧 H5 的小写和 `1/2/3/4`；`parentCode` 去首尾空格后再过滤。
+- `GET /consumer/product-orders` 和 `GET /consumer/activity-bookings` 接受可选 `status` 精确过滤，返回对象统一为 `data.items`、`data.total`，禁止继续返回裸数组。
+- 公共商品/SKU 的可购买字段被强制序列化为 JSON boolean；SKU `spec` 归一为对象，历史 `null`/`"null"` 转为 `{}`。
+- 商品订单与活动预约的 HTTP 集成测试增加：缺少 `Idempotency-Key` 返回 400、`status` 真正过滤列表、列表对象封装；基础数据测试增加地区过滤参数兼容。普通模块测试不连接数据库，真实 MySQL 验收仍需显式设置 `XINGYANSHU_RUN_DB_TESTS=1`。
+
+## 2026-10-29：API-FND-DICT-01 活动票种字典（已实现）
+
+- 新增迁移 `000046_seed_activity_ticket_types.sql` 与 Bootstrap 默认值：`GENERAL` 普通票、`VIP` VIP票、`STUDENT` 学生票、`FREE` 免费票。升级时旧的默认票种统一停用，不删除历史数据。
+- 平台管理员新增 `ACTIVITY_TICKET_TYPE_MANAGE` 权限与 A10 菜单 `MENU_PLATFORM_ACTIVITY_TICKETS`；接口为 `GET /admin/activity-ticket-types`、`PATCH /admin/activity-ticket-types/{ticketTypeCode}`。更新只允许启停和排序，要求乐观锁版本及操作理由。
+- 基础数据真实 MySQL 集成测试覆盖票种全量查询、大小写编码更新、停用和排序；Bootstrap 单测锁定四个初始票种和 A10 菜单。
 
 售后分支：
 

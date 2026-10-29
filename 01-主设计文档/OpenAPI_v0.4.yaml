@@ -238,8 +238,8 @@ paths:
       security: []
       parameters:
         - { $ref: '#/components/parameters/Keyword' }
-        - { name: level, in: query, schema: { type: string, enum: [NATION, PROVINCE, CITY, DISTRICT] } }
-        - { name: parentCode, in: query, schema: { type: string } }
+        - { name: level, in: query, description: 推荐传 NATION/PROVINCE/CITY/DISTRICT；服务端兼容大小写及 1/2/3/4, schema: { type: string, enum: [NATION, PROVINCE, CITY, DISTRICT, '1', '2', '3', '4'] } }
+        - { name: parentCode, in: query, description: 上级六码地区编码；服务端会去除首尾空格, schema: { type: string } }
       responses: { '200': { $ref: '#/components/responses/Ok' } }
   /tags:
     get:
@@ -268,6 +268,21 @@ paths:
       parameters: [ { name: tagId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledChangeRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /admin/activity-ticket-types:
+    get:
+      tags: [平台基础配置]
+      summary: 查询活动票种字典（含停用项）
+      x-roles: [平台管理员]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/activity-ticket-types/{ticketTypeCode}:
+    patch:
+      tags: [平台基础配置]
+      summary: 启停或调整活动票种排序
+      x-roles: [平台管理员]
+      x-idempotency: required
+      parameters: [ { name: ticketTypeCode, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [enabled, sortNo, reason], properties: { enabled: { type: boolean }, sortNo: { type: integer, minimum: 0 }, reason: { type: string, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
   /admin/regions:
     get:
       tags: [平台基础配置]
@@ -960,7 +975,8 @@ paths:
       tags: [消费者H5]
       summary: 查询本人商品订单
       x-roles: [消费者]
-      description: 仅返回当前消费者订单；订单详情中的地址为本人完整快照。
+      description: 仅返回当前消费者订单；响应 data 固定为 {items,total}，不返回裸数组。订单详情中的地址为本人完整快照。
+      parameters: [ { name: status, in: query, description: 可选，按订单状态精确过滤，例如 PENDING_PAYMENT/PENDING_SHIPMENT/CLOSED, schema: { type: string } } ]
       responses: { '200': { $ref: '#/components/responses/Ok' } }
   /consumer/addresses:
     get:
@@ -1053,6 +1069,8 @@ paths:
       tags: [消费者H5]
       summary: 我的活动预约列表
       x-roles: [消费者]
+      description: 响应 data 固定为 {items,total}，不返回裸数组。
+      parameters: [ { name: status, in: query, description: 可选，按预约状态精确过滤，例如 PENDING_PAYMENT/PENDING_VERIFICATION/CLOSED/EXPIRED, schema: { type: string } } ]
       responses: { '200': { $ref: '#/components/responses/Ok' } }
   /consumer/activity-bookings/{bookingId}:
     get:

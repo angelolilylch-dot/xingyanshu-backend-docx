@@ -274,7 +274,10 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求参数 | 返回数据 |
 | --- | --- | --- | --- | --- |
 | GET | `/dictionaries/{dictType}` | 公开 | `enabledOnly` | 仅服务端固定白名单枚举（如 `IP_TYPE`）；返回 `code`、`name`、`sortNo`、`enabled`，不提供字典维护能力 |
-| GET | `/public/regions` | 游客 | `keyword`、`level`（`NATION/PROVINCE/CITY/DISTRICT`）、`parentCode` | 已启用地区编码、名称、层级、上级编码 |
+| GET | `/public/regions` | 游客 | `keyword`、`level`（推荐 `NATION/PROVINCE/CITY/DISTRICT`；兼容大小写与 `1/2/3/4`）、`parentCode`（自动去首尾空格） | 已启用地区编码、名称、层级、上级编码 |
+| GET | `/dictionaries/ACTIVITY_TICKET_TYPE` | 游客/前端 | 无 | 已启用活动票种；初始为 `GENERAL` 普通票、`VIP` VIP票、`STUDENT` 学生票、`FREE` 免费票 |
+| GET | `/admin/activity-ticket-types` | 平台管理员 | 无 | 含停用项的活动票种字典，字段 `id/code/name/sortNo/enabled/status/version/updatedAt` |
+| PATCH | `/admin/activity-ticket-types/{ticketTypeCode}` | 平台管理员 | `enabled`、`sortNo`、`reason`、`If-Match-Version` | 启停或排序；票种编码与名称不可改，避免影响历史活动快照 |
 | GET | `/tags` | 后台已登录 | `tagType`、`keyword` | 已启用标签 ID、名称、类型、状态 |
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
@@ -539,7 +542,8 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/consumer/addresses/{addressId}/default` | 消费者本人 | 乐观锁 / 幂等键 | 设置默认地址 |
 | POST | `/consumer/product-orders/preview` | 消费者 | `items`（`skuId`、`quantity`）、`addressId` | 最新价格、运费、库存校验、售后规则、应付金额 |
 | POST | `/consumer/product-orders` | 消费者 | `items`、`addressId`、`Idempotency-Key` | 商品订单、支付截止时间、支付金额；原子预占库存 |
-| GET | `/consumer/product-orders`、`/{orderId}` | 消费者本人 | 无 | 本人订单及完整收货地址快照 |
+| GET | `/consumer/product-orders` | 消费者本人 | 可选 `status` 精确过滤 | `data={items,total}`；本人订单列表 |
+| GET | `/consumer/product-orders/{orderId}` | 消费者本人 | 无 | 本人订单及完整收货地址快照 |
 | POST | `/consumer/product-orders/{orderId}/cancel` | 消费者本人 | `Idempotency-Key` | 仅待支付，立即释放预占 |
 | POST | `/consumer/product-orders/{orderId}/mock-pay` | 消费者本人 | `outcome=SUCCESS|FAILURE`、幂等键 | **仅 test 注册**；失败保留待支付，成功转待发货 |
 | POST | `/consumer/product-orders/{orderId}/confirm-receipt` | 消费者本人 | - | **API-FUL-01 后实现**：仅已签收且无进行中售后 |
@@ -552,7 +556,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | --- | --- | --- | --- | --- |
 | POST | `/consumer/activity-bookings/preview` | 消费者 | `activityId`、`sessionId`、`ticketTypeId`、`quantity` | 名额、价格、规则、是否可预约 |
 | POST | `/consumer/activity-bookings` | 消费者 | `activityId`、`sessionId`、`ticketTypeId`、`quantity`、`rulesAgreed`、`idempotencyKey` | 收费票返回待支付预约；免费票直接返回待核销预约和核销码摘要 |
-| GET | `/consumer/activity-bookings` | 消费者 | `status`、分页 | 本人预约列表 |
+| GET | `/consumer/activity-bookings` | 消费者 | 可选 `status` 精确过滤 | `data={items,total}`；本人预约列表 |
 | GET | `/consumer/activity-bookings/{bookingId}` | 消费者本人 | 无 | 活动/场次/票种、状态、规则快照、核销码状态 |
 | GET | `/consumer/activity-bookings/{bookingId}/verification-code` | 消费者本人 | 无 | `displayCode`、二维码内容、有效期、状态 | 仅待核销状态 |
 | POST | `/consumer/activity-bookings/{bookingId}/cancel-pending-payment` | 消费者本人 | `reason`、`idempotencyKey` | 已关闭预约 | 仅待支付 |
@@ -569,6 +573,8 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/fulfillment/product-orders/{orderId}/shipments` | 履约客服/符合条件创作者 | `carrierCode`、`trackingNo`、`shippedAt`、`packageCount`、`proofFileId`、`remark`、`idempotencyKey` | 发货单、物流状态 | 仅待发货订单 |
 | GET | `/fulfillment/delivery-orders/{deliveryId}` | 履约客服/订单相关方 | 无 | 发货详情与物流轨迹 |
 | POST | `/integrations/logistics/callbacks` | 物流服务 | 签名、运单号、事件编号、状态、时间、说明 | 接收结果 | 验签 + 事件幂等；非前端调用 |
+
+> 2026-10-29 已完成腾讯云云市场物流查询 Adapter 的真实连通验证；当前由后端以 `GET https://ap-guangzhou.cloudmarket-apigw.com/service-d2zdkymg/express/query` 轮询查询，参数为 `code=auto`、`no=运单号`、`tel=收件手机号后四位`。请求采用云市场 `Authorization`（HMAC-SHA1）和 `request-id`；密钥仅从 `XINGYANSHU_LOGISTICS_SECRET_ID`、`XINGYANSHU_LOGISTICS_SECRET_KEY` 读取，严禁下发浏览器、写入文档或日志。返回 `code="0"` 才有效，`data.logisticsStatus="SIGN"` 代表签收，轨迹取 `data.logisticsTraceDetailList` 的毫秒时间戳和 `desc`。发货、轮询落库、消费者查询及回调路由仍随 API-FUL-01 一并交付；在其完成前前端不得直接调用第三方物流接口。
 
 ### 10.2 现场核销
 
@@ -662,7 +668,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 实名 | `IdentityProvider.Verify` | 主体类型、加密身份资料 | 请求号、通过/失败、摘要 | 认证中/失败均禁止购买和创建内容 |
 | 敏感内容 | `ContentSafetyProvider.Moderate` | 文本、业务数据编号、会话编号 | 腾讯请求号、`PASS/REVIEW/BLOCK`、风险标签、分值 | 腾讯云 TMS 真实调用；`REVIEW`、`BLOCK` 或异常均阻断当前提交 |
 | 文件存储 | `FileStorage.Put/GetSignedURL` | 文件流、权限、用途 | 存储键、Hash、短期 URL | 不暴露长期真实地址 |
-| 物流 | `LogisticsProvider.Query/VerifyCallback` | 运单、承运商、回调数据 | 轨迹、签收、事件号 | 回调幂等；异常记录待处理 |
+| 物流 | `LogisticsProvider.Query/VerifyCallback` | 运单、收件手机号后四位、承运商、回调数据 | 轨迹、签收、事件号 | 已接入腾讯云云市场查询 Adapter；后端轮询，签收码 `SIGN`；回调幂等；异常记录待处理 |
 | 支付 | `PaymentProvider.Initiate/Query/Close/Refund` | 业务订单、金额、幂等键 | 微信支付 V3 流水、H5 支付链接、支付/退款状态 | 测试 Mock；生产微信支付 V3；未来可新增数字人民币实现 |
 | 存证 | `EvidenceProvider.Submit/Query` | 对象、Hash、请求号 | 存证号、回执、状态 | 无回执不得标记成功；保留重试 |
 
