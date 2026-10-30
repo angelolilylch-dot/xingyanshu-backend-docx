@@ -235,11 +235,12 @@ paths:
     get:
       tags: [消费者H5]
       summary: 获取公开地区树
+      description: 返回已启用的全国大陆行政区划快照，按全国（000000）→省级→市级→区县级逐级懒加载。香港、澳门、台湾的细化层级不在本快照内。
       security: []
       parameters:
         - { $ref: '#/components/parameters/Keyword' }
-        - { name: level, in: query, schema: { type: string, enum: [NATION, PROVINCE, CITY, DISTRICT] } }
-        - { name: parentCode, in: query, schema: { type: string } }
+        - { name: level, in: query, description: 可传 NATION/PROVINCE/CITY/DISTRICT；兼容大小写及 0/1/2/3（依次为全国/省/市/区县；4 兼容为区县）, schema: { type: string, enum: [NATION, PROVINCE, CITY, DISTRICT, '0', '1', '2', '3', '4'] } }
+        - { name: parentCode, in: query, description: 上级六码编码；全国根节点为 000000, schema: { type: string, pattern: '^[0-9]{6}$' } }
       responses: { '200': { $ref: '#/components/responses/Ok' } }
   /tags:
     get:
