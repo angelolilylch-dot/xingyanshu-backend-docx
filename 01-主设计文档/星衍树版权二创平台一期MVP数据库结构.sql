@@ -1218,6 +1218,7 @@ CREATE TABLE IF NOT EXISTS `delivery_order` (
   `shipped_at` DATETIME(3) NOT NULL COMMENT '发货时间',
   `signed_at` DATETIME(3) NULL DEFAULT NULL COMMENT '签收时间',
   `proof_file_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '发货凭证',
+  `remark` VARCHAR(500) NULL DEFAULT NULL COMMENT '发货备注',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_delivery_order_delivery_no` (`delivery_no`),
   UNIQUE KEY `uk_delivery_order_order_id` (`order_id`),

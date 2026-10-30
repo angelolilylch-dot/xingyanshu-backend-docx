@@ -1028,11 +1028,19 @@ paths:
   /consumer/product-orders/{orderId}/confirm-receipt:
     post:
       tags: [消费者H5]
-      summary: 确认收货（API-FUL-01 后实现；当前未注册）
+      summary: 确认收货
       x-roles: [消费者]
       x-state-precondition: 已签收且不存在进行中售后
-      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+      x-idempotency: required
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/product-orders/{orderId}/logistics:
+    get:
+      tags: [消费者H5]
+      summary: 查看本人订单物流
+      x-roles: [消费者]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
   /consumer/activity-bookings/preview:
     post:
       tags: [消费者H5]
@@ -1091,11 +1099,27 @@ paths:
     post:
       tags: [履约与售后]
       summary: 发货
-      x-roles: [履约客服, 创作者]
-      x-data-scope: 创作者仅可处理本人 CREATOR_SHIP 订单
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_SHIPMENT_MANAGE
       parameters: [ { name: orderId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShipmentRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /fulfillment/shipments:
+    get:
+      tags: [履约与售后]
+      summary: 履约发货订单列表
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_SHIPMENT_MANAGE
+      parameters: [ { name: status, in: query, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /fulfillment/delivery-orders/{deliveryId}:
+    get:
+      tags: [履约与售后]
+      summary: 发货单与物流轨迹详情
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_SHIPMENT_MANAGE
+      parameters: [ { name: deliveryId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
   /fulfillment/verifications:
     post:
       tags: [履约与售后]
@@ -1839,8 +1863,8 @@ components:
       properties: { activityId: { type: string }, sessionId: { type: string }, ticketTypeId: { type: string }, quantity: { type: integer, minimum: 1 }, rulesAgreed: { type: boolean, enum: [true] } }
     ShipmentRequest:
       type: object
-      required: [carrierCode, trackingNo, shippedAt, packageCount]
-      properties: { carrierCode: { type: string }, trackingNo: { type: string }, shippedAt: { type: string, format: date-time }, packageCount: { type: integer, minimum: 1 }, proofFileId: { type: string }, remark: { type: string, maxLength: 500 } }
+      required: [carrierCode, trackingNo]
+      properties: { carrierCode: { type: string, maxLength: 64 }, trackingNo: { type: string, maxLength: 128 }, shippedAt: { type: string, format: date-time, description: 可选 RFC3339 发货时间 }, proofFileId: { type: string, description: 可选发货凭证文件 ID }, remark: { type: string, maxLength: 500 } }
     VerificationRequest:
       type: object
       required: [bookingId, displayCode, verificationPoint, result]

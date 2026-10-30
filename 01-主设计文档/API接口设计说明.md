@@ -546,7 +546,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/consumer/product-orders/{orderId}` | 消费者本人 | 无 | 本人订单及完整收货地址快照 |
 | POST | `/consumer/product-orders/{orderId}/cancel` | 消费者本人 | `Idempotency-Key` | 仅待支付，立即释放预占 |
 | POST | `/consumer/product-orders/{orderId}/mock-pay` | 消费者本人 | `outcome=SUCCESS|FAILURE`、幂等键 | **仅 test 注册**；失败保留待支付，成功转待发货 |
-| POST | `/consumer/product-orders/{orderId}/confirm-receipt` | 消费者本人 | - | **API-FUL-01 后实现**：仅已签收且无进行中售后 |
+| POST | `/consumer/product-orders/{orderId}/confirm-receipt` | 消费者本人 | `Idempotency-Key` | 仅已签收且无进行中售后；转已完成 |
 
 购物车仅由 H5 浏览器本地状态管理；后端不建立购物车库存锁定接口。每次预览和创建订单都重新校验 SKU 状态、库存、价格、运费和商品发布状态。平台统一履约，默认单包裹；发货、拆包、物流、签收、确认收货和售后不属于 API-H5-02。
 
@@ -569,12 +569,14 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 | 方法 | 路径 | 角色 | 请求字段 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
-| GET | `/fulfillment/shipments` | 履约客服；创作者仅本人自行发货订单 | `orderNo`、`status`、`fulfillmentMode`、日期范围、分页 | 待发货/已发货订单列表，地址按权限脱敏 |
-| POST | `/fulfillment/product-orders/{orderId}/shipments` | 履约客服/符合条件创作者 | `carrierCode`、`trackingNo`、`shippedAt`、`packageCount`、`proofFileId`、`remark`、`idempotencyKey` | 发货单、物流状态 | 仅待发货订单 |
-| GET | `/fulfillment/delivery-orders/{deliveryId}` | 履约客服/订单相关方 | 无 | 发货详情与物流轨迹 |
-| POST | `/integrations/logistics/callbacks` | 物流服务 | 签名、运单号、事件编号、状态、时间、说明 | 接收结果 | 验签 + 事件幂等；非前端调用 |
+| GET | `/fulfillment/shipments` | 具备 `FULFILLMENT_SHIPMENT_MANAGE` 的履约客服 | `status`（可选） | 待发货/已发货订单列表；地址和运单号始终脱敏 |
+| POST | `/fulfillment/product-orders/{orderId}/shipments` | 具备 `FULFILLMENT_SHIPMENT_MANAGE` 的履约客服 | `carrierCode`、`trackingNo`、`shippedAt`（RFC3339，可选）、`proofFileId`、`remark`；`Idempotency-Key` | 发货单、物流状态 | 仅待发货订单；同键重放、异体冲突 |
+| GET | `/fulfillment/delivery-orders/{deliveryId}` | 具备 `FULFILLMENT_SHIPMENT_MANAGE` 的履约客服 | 无 | 发货详情与物流轨迹 |
+| GET | `/consumer/product-orders/{orderId}/logistics` | 消费者本人 | 无 | 自己订单的物流状态与轨迹 |
+| POST | `/consumer/product-orders/{orderId}/confirm-receipt` | 消费者本人 | `Idempotency-Key` | 仅已签收且无进行中售后；转已完成 |
+| POST | `/integrations/logistics/callbacks` | 物流服务 | 签名、运单号、事件编号、状态、时间、说明 | **后续兼容项，当前未注册** | 未来验签 + 事件幂等；非前端调用 |
 
-> 2026-10-29 已完成腾讯云云市场物流查询 Adapter 的真实连通验证；当前由后端以 `GET https://ap-guangzhou.cloudmarket-apigw.com/service-d2zdkymg/express/query` 轮询查询，参数为 `code=auto`、`no=运单号`、`tel=收件手机号后四位`。请求采用云市场 `Authorization`（HMAC-SHA1）和 `request-id`；密钥仅从 `XINGYANSHU_LOGISTICS_SECRET_ID`、`XINGYANSHU_LOGISTICS_SECRET_KEY` 读取，严禁下发浏览器、写入文档或日志。返回 `code="0"` 才有效，`data.logisticsStatus="SIGN"` 代表签收，轨迹取 `data.logisticsTraceDetailList` 的毫秒时间戳和 `desc`。发货、轮询落库、消费者查询及回调路由仍随 API-FUL-01 一并交付；在其完成前前端不得直接调用第三方物流接口。
+> 2026-10-30 已完成腾讯云云市场物流查询 Adapter、发货、轮询落库、消费者查询、签收和自动确认收货。后端以 `GET https://ap-guangzhou.cloudmarket-apigw.com/service-d2zdkymg/express/query` 轮询查询，参数为 `code=auto`、`no=运单号`、`tel=收件手机号后四位`。请求采用云市场 `Authorization`（HMAC-SHA1）和 `request-id`；密钥仅从 `XINGYANSHU_LOGISTICS_SECRET_ID`、`XINGYANSHU_LOGISTICS_SECRET_KEY` 读取，严禁下发浏览器、写入文档或日志。返回 `code="0"` 才有效，`data.logisticsStatus="SIGN"` 代表签收，轨迹取 `data.logisticsTraceDetailList` 的毫秒时间戳和 `desc`。签收后无进行中售后的订单可由消费者确认，或由 Worker 在 7 天后自动完成；物流回调兼容入口尚未实现，当前以轮询为唯一生产路径。前端不得直接调用第三方物流接口。
 
 ### 10.2 现场核销
 

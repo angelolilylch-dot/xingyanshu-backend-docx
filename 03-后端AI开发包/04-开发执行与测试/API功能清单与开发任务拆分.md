@@ -77,7 +77,7 @@
 | API-H5-01 | H5 公开浏览与客服信息 | P0 | 8 | API-CNT-02、API-CNT-03 | 已完成：匿名商品/活动浏览、稳定公开展示图、暂停报名活动展示、客服信息及真实 MySQL HTTP 回归 |
 | API-H5-02 | 商品订单预览、库存预占与商品订单 | P0 | 8 | API-FND-01、API-CNT-02 | 待开发 |
 | API-H5-03 | 活动预约、免费票与核销码展示 | P0 | 6 | API-FND-01、API-CNT-03 | 待开发 |
-| API-FUL-01 | 发货、物流与签收回调 | P0 | 4 | API-H5-02、API-FND-05 | 开发中：物流查询 Adapter 已真实验证 |
+| API-FUL-01 | 发货、物流与签收 | P0 | 4 | API-H5-02、API-FND-05 | 已完成；物流回调入口改为后续兼容项 |
 | API-FUL-02 | 现场核销与活动订单完成 | P0 | 3 | API-H5-03 | 待开发 |
 | API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 待开发 |
 | API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 待开发 |
@@ -301,9 +301,9 @@
 - **主写表：** `delivery_order`、`logistics_event`、`product_order`。
 - **关联校验表：** `product_order_item`、`product`、`creator_profile`、`sys_user`、`file_object`。
 - **异步/联动表：** `evidence_record`、`biz_status_history`、`sys_audit_log`、订单自动完成任务。
-- **当前进度：** 已完成并真实验证底层 `LogisticsProvider.Query`；其余发货路由、轨迹落库、定时轮询、签收后 7 天自动确认和物流回调尚未注册，不能对前端宣称已可用。
-- **核心实现：** 仅待发货订单可发货；创作者只能操作本人自行发货订单，平台统一发货由履约客服处理；优先以已接入的后端轮询查询保存轨迹并推进签收，物流回调作为兼容入口同样执行验签和事件幂等；签收后 7 天无进行中售后自动确认收货。
-- **验收：** 重复回调不回退签收状态；收货地址仅按角色脱敏可见；发货后消费者可查询轨迹；发货凭证进入文件/存证链路。
+- **接口范围：** `GET /fulfillment/shipments`、`POST /fulfillment/product-orders/{orderId}/shipments`、`GET /fulfillment/delivery-orders/{deliveryId}`、`GET /consumer/product-orders/{orderId}/logistics`、`POST /consumer/product-orders/{orderId}/confirm-receipt`。
+- **核心实现：** 仅待发货订单可由具有 `FULFILLMENT_SHIPMENT_MANAGE` 的履约客服发货；发货写入 `delivery_order` 并更新订单为 `SHIPPED`。Worker 用已验证的腾讯云云市场 Adapter 轮询、对 `delivery_id + event_no` 幂等落 `logistics_event`；`SIGN` 推进发货单和订单为 `SIGNED`。消费者只能查询本人订单，确认收货和同键重放均被后端校验；签收 7 天且无进行中售后自动完成。后台列表一律脱敏地址和运单号。
+- **验收：** 已完成真实 MySQL 发货→模拟物流签收→消费者查询→确认收货，以及签收超过 7 天自动完成测试；腾讯云云市场真实圆通单号查询已返回派送中 9 条轨迹。当前生产路径为后端轮询；`POST /integrations/logistics/callbacks` 未实现，不得对外开放。
 
 ### API-FUL-02 现场核销与活动订单完成
 
