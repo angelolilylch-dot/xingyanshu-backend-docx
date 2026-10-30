@@ -483,7 +483,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
-| GET | `/creator/activities` | 创作者 | `keyword`、`cityCode`、`status`、日期范围、分页 | 本人活动列表、预约统计和校验状态 |
+| GET | `/creator/activities` | 创作者 | `keyword`、`ipId`、`cityCode`、`status`、`pageNo`、`pageSize` | 分页活动管理摘要：活动/授权/IP、封面、场次时间与总名额、已报名/剩余名额、成功报名数、检测状态及可暂停/恢复/下架标识；不返回场次和票种数组 |
 | POST | `/creator/activities` | 创作者 | 活动字段、`authorizationId`、场次和票种、固定退款模板 | 授权须允许活动并覆盖举办城市；文本检测 `PASS` 后自动发布，无图片或人工审核 |
 | GET | `/creator/activities/{activityId}` | 创作者本人 | 无 | 活动、场次、票种、规则、校验结果、预约摘要 |
 | POST | `/creator/activities/{activityId}/pause-booking` | 创作者 | `Idempotency-Key` | 有报名时暂停后续报名 |

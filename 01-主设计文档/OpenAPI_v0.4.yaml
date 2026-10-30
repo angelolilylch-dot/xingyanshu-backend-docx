@@ -882,6 +882,7 @@ paths:
     get:
       tags: [作品与内容]
       summary: 查询本人活动
+      description: "返回 data.items[] 活动管理摘要：id、activityNo、status、activityName、venueName、coverFileId、checkStatus、authorizationId、ipId、sessionCount、earliestStartAt、latestEndAt、quotaTotal、bookedQuantity、remainingQuota、successfulBookingCount、canPauseBooking、canResumeBooking、canDelist。列表不返回 sessions/tickets，详情按活动 ID 单独查询。"
       x-roles: [创作者]
       parameters: [ { name: keyword, in: query, schema: { type: string } }, { name: ipId, in: query, schema: { type: string } }, { name: cityCode, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
       responses: { '200': { $ref: '#/components/responses/Ok' } }
