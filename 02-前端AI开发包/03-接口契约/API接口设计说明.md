@@ -526,7 +526,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/public/products` | 游客 | `keyword`、`regionCode`、`productType`、价格区间、`sortBy`、分页 | 已发布商品；不返回 IP 字段；售罄商品可返回但 `purchasable=false` |
 | GET | `/public/products/{productId}` | 游客 | 无 | 商品、SKU、配送、售后规则、版权说明；隐藏内部授权与分账 |
 | GET | `/public/activities` | 游客 | `keyword`、`cityCode`、日期范围、价格区间、分页 | 已发布活动；暂停报名活动仍可展示并返回 `bookingPaused=true`，但不可预约 |
-| GET | `/public/activities/{activityId}` | 游客 | 无 | 活动、地点、场次、票种、预约规则、取消/退款规则、版权说明 |
+| GET | `/public/activities/{activityId}` | 游客 | 无 | 活动、地点、场次及其 `tickets[]`、预约规则、取消/退款规则、版权说明；`sessions[].startAt/endAt` 由后端直接输出东八区展示时间 `YYYY-MM-DD HH:mm:ss`，无票种时返回 `[]` |
 | GET | `/public/service-contact` | 游客 | 无 | 平台电话、服务时间、服务说明 |
 | GET | `/public/media/{fileId}` | 游客 | 无 | 已发布商品、有效活动引用的封面/详情/SKU 展示图稳定地址；内容下架后立即拒绝访问，不公开附件、源文件、版权材料或存储键 |
 

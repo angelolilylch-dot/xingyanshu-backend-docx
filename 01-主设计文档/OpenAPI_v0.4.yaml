@@ -941,6 +941,7 @@ paths:
     get:
       tags: [消费者H5]
       summary: 活动公开详情
+      description: "返回活动及 sessions[]；每个场次包含 tickets[]（已发布票种）。sessions[].startAt/endAt 已由后端转换为东八区展示时间，格式 YYYY-MM-DD HH:mm:ss；无票种时 tickets 返回空数组。"
       security: []
       parameters: [ { name: activityId, in: path, required: true, schema: { type: string } } ]
       responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
