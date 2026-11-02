@@ -280,6 +280,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
 | GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | A05 的“客服信息”页签维护 `PLATFORM_SERVICE_PHONE`、`PLATFORM_SERVICE_HOURS`、`PLATFORM_SERVICE_DESCRIPTION`；保存后 `/public/service-contact` 返回最新公开值。密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | 商品/活动规则 JSON、退货费用承担方、启停原因 | 原模板不可编辑；新版本自动停用旧版本 |
+| GET | `/creator/after-sale-templates` | 创作者 | 必填 `bizType=PRODUCT|ACTIVITY`；兼容 `pageNo/pageSize` | 仅返回启用且有效的模板，供商品/活动表单下拉；不允许维护模板 |
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
 
@@ -486,6 +487,9 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/creator/activities/{activityId}/pause-booking` | 创作者 | `Idempotency-Key` | 有报名时暂停后续报名 |
 | POST | `/creator/activities/{activityId}/resume-booking` | 创作者 | `Idempotency-Key` | 授权和活动仍有效才恢复 |
 | POST | `/creator/activities/{activityId}/delist` | 创作者 | `Idempotency-Key` | 仅无任何成功报名时允许 |
+| GET/POST | `/creator/activities/{activityId}/checkin-qrcode` | 创作者本人 | `Idempotency-Key`（POST） | 取得或生成每活动一张持久现场二维码；二维码只打开消费者 H5，不直接核销 |
+| GET | `/creator/activities/{activityId}/checkin-qrcode/download` | 创作者本人 | 无 | 下载现场展示/印刷用 PNG |
+| POST | `/creator/activities/{activityId}/checkin-qrcode/rotate` | 创作者本人 | `Idempotency-Key` | 撤销旧码并立即生成新码 |
 
 活动创建 DTO：
 
@@ -577,8 +581,9 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
 | GET | `/fulfillment/activity-bookings` | 履约客服 | `activityId`、`sessionId`、`verificationStatus`、日期范围、分页 | 待核销预约列表 |
-| POST | `/fulfillment/verifications/preview` | 履约客服 | `displayCode` 或扫码内容 | 预约、活动、场次、票种、可核销状态 |
-| POST | `/fulfillment/verifications` | 履约客服 | `bookingId`、`displayCode`、`verificationPoint`、`result`、`exceptionType`、`exceptionComment`、`evidenceFileId`、`idempotencyKey` | 核销记录、预约最新状态 | 成功仅一次；重复返回已核销 |
+| GET | `/public/activity-checkin-qrcodes/{entryCode}` | 游客 | `entryCode` | 仅活动名称、地点、`requiresLogin`；不返回预约或消费者数据 |
+| GET | `/consumer/activity-check-ins/{entryCode}/preview` | 消费者 | `entryCode` | 仅本人、本活动、待核销且处于时间窗的预约列表 |
+| POST | `/consumer/activity-check-ins/{entryCode}/confirm` | 消费者 | `activityBookingId`、可选 `location`、`Idempotency-Key` | 原子写核销记录，预约转 `VERIFIED`，预约码转 `USED`；同键重放、同键异体冲突 |
 
 `result=SUCCESS` 时服务端必须校验预约为待核销、核销码有效、活动/场次/票种一致；成功后完成预约并触发普通授权分账计算。
 

@@ -304,14 +304,14 @@
 - **核心实现：** 仅待发货订单可由履约客服发货；物流由后端轮询查询并以唯一事件号幂等落库，签收后更新订单；消费者可在无售后时确认收货，签收满 7 天自动完成。物流回调入口、包裹拆分和创作者自行发货为后续能力。
 - **验收：** 重复回调不回退签收状态；收货地址仅按角色脱敏可见；发货后消费者可查询轨迹；发货凭证进入文件/存证链路。
 
-### API-FUL-02 现场核销与活动订单完成
+### API-FUL-02 活动现场自助核销（核销核心已完成）
 
-- **接口范围：** `GET /fulfillment/activity-bookings`、`POST /fulfillment/verifications/preview`、`POST /fulfillment/verifications`。
-- **主写表：** `verification_record`、`verification_code`、`activity_booking`。
-- **关联校验表：** `activity`、`activity_session`、`activity_ticket_type`、`consumer_account`、`sys_user`、`file_object`。
-- **异步/联动表：** `finance_share_record`、`finance_share_item`、`evidence_record`、`biz_status_history`、`sys_audit_log`。
-- **核心实现：** 校验核销码、预约状态、活动、场次、票种和未使用状态；成功后核销码永久失效，预约完成并触发普通授权分账。
-- **验收：** 重复核销返回已核销且不重复分账；核销失败可记录异常但不改变预约完成状态；核销人员、地点、时间和凭证完整留痕。
+- **接口范围：** `POST/GET /creator/activities/{activityId}/checkin-qrcode`、`GET .../download`、`POST .../rotate`、`GET /public/activity-checkin-qrcodes/{entryCode}`、`GET /consumer/activity-check-ins/{entryCode}/preview`、`POST /consumer/activity-check-ins/{entryCode}/confirm`。
+- **主写表：** `activity_checkin_qrcode`、`verification_record`、`verification_code`、`activity_booking`；迁移 `000050_activity_self_checkin.sql`。
+- **核心实现：** 固定现场码只定位活动；消费者必须登录，且仅能选择本人、本活动、待核销且处于开场前 2 小时至场次结束时间窗的预约。确认后预约转 `VERIFIED`、预约码转 `USED`，位置可选且仅审计。
+- **验收：** 本地真实 MySQL 已验证固定码、登录后预览、首次确认、同键重放、同键异体冲突和 `CONSUMER_SELF_SCAN` 审计主体；财务分账属于 API-FIN-01，未伪造为已完成。
+
+> 2026-11-02 补充创作者表单依赖：售后模板下拉使用 `GET /creator/after-sale-templates?bizType=PRODUCT|ACTIVITY`，只返回已启用模板。`/platform/refund-templates` 未实现，不得调用；模板维护仍仅限 `/admin/after-sale-templates`。
 
 ## 8. 售后、退款与财务任务
 

@@ -304,14 +304,11 @@
 - **核心实现：** 仅待发货订单可由履约客服发货；物流由后端轮询查询并以唯一事件号幂等落库，签收后更新订单；消费者可在无售后时确认收货，签收满 7 天自动完成。物流回调入口、包裹拆分和创作者自行发货为后续能力。
 - **验收：** 重复回调不回退签收状态；收货地址仅按角色脱敏可见；发货后消费者可查询轨迹；发货凭证进入文件/存证链路。
 
-### API-FUL-02 现场核销与活动订单完成
+### API-FUL-02 活动现场自助核销（核销核心已完成）
 
-- **接口范围：** `GET /fulfillment/activity-bookings`、`POST /fulfillment/verifications/preview`、`POST /fulfillment/verifications`。
-- **主写表：** `verification_record`、`verification_code`、`activity_booking`。
-- **关联校验表：** `activity`、`activity_session`、`activity_ticket_type`、`consumer_account`、`sys_user`、`file_object`。
-- **异步/联动表：** `finance_share_record`、`finance_share_item`、`evidence_record`、`biz_status_history`、`sys_audit_log`。
-- **核心实现：** 校验核销码、预约状态、活动、场次、票种和未使用状态；成功后核销码永久失效，预约完成并触发普通授权分账。
-- **验收：** 重复核销返回已核销且不重复分账；核销失败可记录异常但不改变预约完成状态；核销人员、地点、时间和凭证完整留痕。
+- **接口范围：** 创作者固定现场码生成/下载/更换、登录前现场码校验、消费者扫码预览与二次确认。
+- **实现边界：** 现场人员不登录系统；消费者仅核销本人待核销预约；时间窗为开场前 2 小时至场次结束；位置为可选审计；确认接口强制 `Idempotency-Key`。
+- **验收：** 本地真实 MySQL 已验证首次确认、同键重放、同键异体冲突和核销审计；分账由 API-FIN-01 后续实现。
 
 ## 8. 售后、退款与财务任务
 

@@ -280,6 +280,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
 | GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | 密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | 商品/活动规则 JSON、退货费用承担方、启停原因 | 原模板不可编辑；新版本自动停用旧版本 |
+| GET | `/creator/after-sale-templates` | 创作者 | 必填 `bizType=PRODUCT|ACTIVITY`；兼容 `pageNo/pageSize` | 仅返回启用且有效的模板，供商品/活动表单下拉；不允许维护模板 |
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
 
@@ -486,6 +487,11 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/creator/activities/{activityId}/pause-booking` | 创作者 | `Idempotency-Key` | 有报名时暂停后续报名 |
 | POST | `/creator/activities/{activityId}/resume-booking` | 创作者 | `Idempotency-Key` | 授权和活动仍有效才恢复 |
 | POST | `/creator/activities/{activityId}/delist` | 创作者 | `Idempotency-Key` | 仅无任何成功报名时允许 |
+| GET/POST | `/creator/activities/{activityId}/checkin-qrcode` | 创作者本人 | `Idempotency-Key`（POST） | 取得或生成每活动一张持久现场二维码；二维码只打开消费者 H5，不直接核销 |
+| GET | `/creator/activities/{activityId}/checkin-qrcode/download` | 创作者本人 | 无 | 下载现场展示/印刷用 PNG |
+| POST | `/creator/activities/{activityId}/checkin-qrcode/rotate` | 创作者本人 | `Idempotency-Key` | 撤销旧码并立即生成新码；前端必须二次确认 |
+| GET | `/public/activity-checkin-qrcodes/{entryCode}` | 游客 | 无 | 登录前校验活动现场码；仅返回活动名称、地点和 `requiresLogin` |
+| GET/POST | `/consumer/activity-check-ins/{entryCode}/preview`、`.../confirm` | 消费者 | `Idempotency-Key`（confirm） | 登录后仅匹配本人可核销预约；确认时可选上报位置审计，时间窗为开场前 2 小时至结束前 |
 
 活动创建 DTO：
 

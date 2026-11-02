@@ -305,14 +305,14 @@
 - **核心实现：** 仅待发货订单可由具有 `FULFILLMENT_SHIPMENT_MANAGE` 的履约客服发货；发货写入 `delivery_order` 并更新订单为 `SHIPPED`。Worker 用已验证的腾讯云云市场 Adapter 轮询、对 `delivery_id + event_no` 幂等落 `logistics_event`；`SIGN` 推进发货单和订单为 `SIGNED`。消费者只能查询本人订单，确认收货和同键重放均被后端校验；签收 7 天且无进行中售后自动完成。后台列表一律脱敏地址和运单号。
 - **验收：** 已完成真实 MySQL 发货→模拟物流签收→消费者查询→确认收货，以及签收超过 7 天自动完成测试；腾讯云云市场真实圆通单号查询已返回派送中 9 条轨迹。当前生产路径为后端轮询；`POST /integrations/logistics/callbacks` 未实现，不得对外开放。
 
-### API-FUL-02 现场核销与活动订单完成
+### API-FUL-02 活动现场自助核销（核销核心已完成）
 
-- **接口范围：** `GET /fulfillment/activity-bookings`、`POST /fulfillment/verifications/preview`、`POST /fulfillment/verifications`。
-- **主写表：** `verification_record`、`verification_code`、`activity_booking`。
-- **关联校验表：** `activity`、`activity_session`、`activity_ticket_type`、`consumer_account`、`sys_user`、`file_object`。
-- **异步/联动表：** `finance_share_record`、`finance_share_item`、`evidence_record`、`biz_status_history`、`sys_audit_log`。
-- **核心实现：** 校验核销码、预约状态、活动、场次、票种和未使用状态；成功后核销码永久失效，预约完成并触发普通授权分账。
-- **验收：** 重复核销返回已核销且不重复分账；核销失败可记录异常但不改变预约完成状态；核销人员、地点、时间和凭证完整留痕。
+- **接口范围：** `POST/GET /creator/activities/{activityId}/checkin-qrcode`、`GET .../download`、`POST .../rotate`、`GET /public/activity-checkin-qrcodes/{entryCode}`、`GET /consumer/activity-check-ins/{entryCode}/preview`、`POST /consumer/activity-check-ins/{entryCode}/confirm`。
+- **主写表：** `activity_checkin_qrcode`、`verification_record`、`verification_code`、`activity_booking`；迁移 `000050_activity_self_checkin.sql` 已加入。
+- **部署配置：** `activity.checkin_h5_url` 必须是消费者 H5 的绝对 `http/https` 入口；生产环境缺失或格式不合法时应用拒绝启动，避免生成无法打开的二维码。
+- **核心实现：** 每活动一张持久现场码，创作者可下载、更换；二维码只定位活动。消费者扫码后必须登录，服务端仅返回本人、本活动、`PENDING_VERIFICATION` 且核销码有效的预约；在开场前 2 小时到场次结束前，用户二次确认后原子写入核销记录、将预约/预约码转为 `VERIFIED`/`USED`。位置字段可选，仅审计。
+- **幂等与边界：** 二维码生成、更换与确认都要求 `Idempotency-Key`；同键同请求重放、同键不同请求冲突。无资格、时间窗外、失效二维码分别返回明确错误，不泄露其他消费者预约。
+- **验收：** 本地真实 MySQL 已验证固定码、公开码校验、登录后预览、首次确认、同键重放、同键异体冲突和 `CONSUMER_SELF_SCAN` 审计主体；财务分账由 API-FIN-01 后续承接，不在本任务伪造完成。
 
 ## 8. 售后、退款与财务任务
 

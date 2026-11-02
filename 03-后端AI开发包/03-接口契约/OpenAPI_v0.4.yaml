@@ -333,6 +333,15 @@ paths:
       parameters: [ { name: templateId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnabledChangeRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/after-sale-templates:
+    get:
+      tags: [创作者]
+      summary: 查询创作者可选售后模板
+      description: 仅返回 enabled=true 且 status=ACTIVE 的指定业务类型模板，供商品/活动创建页下拉选择；不是管理员维护接口。
+      x-roles: [创作者]
+      parameters: [ { name: bizType, in: query, required: true, schema: { type: string, enum: [PRODUCT, ACTIVITY] } }, { name: pageNo, in: query, schema: { type: integer, minimum: 1, description: 前端兼容参数，当前返回全部可用项 } }, { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, description: 前端兼容参数，当前返回全部可用项 } } ]
+      x-success-response-fields: [items]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' } }
   /creator/auth/sms/send:
     post:
       tags: [创作者认证]
@@ -1098,6 +1107,65 @@ paths:
       parameters: [ { name: bookingId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductOrderMockPayRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /public/activity-checkin-qrcodes/{entryCode}:
+    get:
+      tags: [公开接口]
+      summary: 校验活动现场二维码（登录前可调用）
+      description: 仅返回活动名称、地点和 requiresLogin，不返回预约、消费者或核销信息。
+      parameters: [ { name: entryCode, in: path, required: true, schema: { type: string } } ]
+      x-success-response-fields: [activityId, activityName, venueName, requiresLogin]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/activity-check-ins/{entryCode}/preview:
+    get:
+      tags: [消费者H5]
+      summary: 扫码后查询本人可核销预约
+      description: 必须使用消费者 H5 登录态；仅返回当前用户、本活动、待核销且在开场前 2 小时至场次结束前的预约。
+      x-roles: [消费者]
+      parameters: [ { name: entryCode, in: path, required: true, schema: { type: string } } ]
+      x-success-response-fields: [activityId, activityName, venueName, mapPointName, checkinQrcodeId, eligibleBookings, locationOptional]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/activity-check-ins/{entryCode}/confirm:
+    post:
+      tags: [消费者H5]
+      summary: 消费者确认现场自助核销
+      description: 用户在确认页选择一笔本人预约后提交；可选位置只用于审计，不因未授权位置而拒绝核销。
+      x-roles: [消费者]
+      x-idempotency: required
+      parameters: [ { name: entryCode, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityCheckinConfirmRequest' } } } }
+      x-success-response-fields: [activityBookingId, activityId, status, verificationStatus, verifiedAt]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /creator/activities/{activityId}/checkin-qrcode:
+    get:
+      tags: [创作者]
+      summary: 查看活动固定现场核销二维码
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } } ]
+      x-success-response-fields: [qrcodeId, qrcodeNo, activityId, entryCode, checkinURL, status, scanCount, createdAt, updatedAt]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+    post:
+      tags: [创作者]
+      summary: 生成或取得活动固定现场核销二维码
+      description: 同一活动重复调用返回同一张未撤销二维码；现场仅需展示或下载此二维码。
+      x-roles: [创作者]
+      x-idempotency: required
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/activities/{activityId}/checkin-qrcode/download:
+    get:
+      tags: [创作者]
+      summary: 下载活动现场核销二维码 PNG
+      x-roles: [创作者]
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: PNG 文件 }, '404': { $ref: '#/components/responses/NotFound' } }
+  /creator/activities/{activityId}/checkin-qrcode/rotate:
+    post:
+      tags: [创作者]
+      summary: 撤销旧码并生成新的活动现场核销二维码
+      x-roles: [创作者]
+      x-idempotency: required
+      parameters: [ { name: activityId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
   /fulfillment/product-orders/{orderId}/shipments:
     post:
       tags: [履约与售后]
@@ -1123,15 +1191,6 @@ paths:
       x-permission: FULFILLMENT_SHIPMENT_MANAGE
       parameters: [ { name: deliveryId, in: path, required: true, schema: { type: string } } ]
       responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
-  /fulfillment/verifications:
-    post:
-      tags: [履约与售后]
-      summary: 现场核销活动预约
-      x-roles: [履约客服]
-      x-idempotency: required
-      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VerificationRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
   /consumer/after-sales/product:
     post:
       tags: [履约与售后]
@@ -1864,14 +1923,24 @@ components:
       type: object
       required: [activityId, sessionId, ticketTypeId, quantity, rulesAgreed]
       properties: { activityId: { type: string }, sessionId: { type: string }, ticketTypeId: { type: string }, quantity: { type: integer, minimum: 1 }, rulesAgreed: { type: boolean, enum: [true] } }
+    ActivityCheckinConfirmRequest:
+      type: object
+      required: [activityBookingId]
+      properties:
+        activityBookingId: { type: string, description: 从 preview.eligibleBookings 选择的本人预约 ID }
+        location:
+          type: object
+          nullable: true
+          description: 浏览器定位可选，仅作审计；用户拒绝授权时不得阻止核销。
+          properties:
+            longitude: { type: number, minimum: -180, maximum: 180 }
+            latitude: { type: number, minimum: -90, maximum: 90 }
+            accuracy: { type: number, minimum: 0 }
+            capturedAt: { type: string, format: date-time }
     ShipmentRequest:
       type: object
       required: [carrierCode, trackingNo]
       properties: { carrierCode: { type: string, maxLength: 64 }, trackingNo: { type: string, maxLength: 128 }, shippedAt: { type: string, format: date-time, description: 可选 RFC3339 发货时间 }, proofFileId: { type: string, description: 可选发货凭证文件 ID }, remark: { type: string, maxLength: 500 } }
-    VerificationRequest:
-      type: object
-      required: [bookingId, displayCode, verificationPoint, result]
-      properties: { bookingId: { type: string }, displayCode: { type: string }, verificationPoint: { type: string }, result: { type: string, enum: [SUCCESS, EXCEPTION] }, exceptionType: { type: string }, exceptionComment: { type: string }, evidenceFileId: { type: string } }
     ProductAfterSaleRequest:
       type: object
       required: [orderId, orderItemId, afterSaleType, reasonCode]
