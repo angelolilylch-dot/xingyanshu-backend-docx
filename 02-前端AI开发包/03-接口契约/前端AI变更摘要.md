@@ -1,5 +1,9 @@
 # 前端 AI 变更摘要
 
+## 2026-11-03：B02 IP 入库新增创作过程视频
+
+城市运营录入或编辑 IP 时，在展示资料区新增“创作过程视频（私有审核资料）”。文件先走 `POST /api/v1/files`，再在 `POST/PATCH /api/v1/ips` 提交 `creationProcessVideos[]`（`fileId`、`description` 必填，`recordedAt` 可选）和 `creationProcessVideoExemptionReason`。仅接受 MP4，最多 3 个，单个及合计均不超过 100MB；`rightHolder.acquisitionMethod=ORIGINAL_CREATION` 至少上传 1 个，其他权利取得方式未上传时必须填写豁免说明。字段旁放置 `ⓘ`，点击弹出用途说明：展示创作、设计、制作或组织过程，可作为审核佐证；不要上传纯宣传片、无关视频或包含不必要个人隐私的内容。详情按 `GET /api/v1/ips/{ipId}` 的 `creationProcessVideos[]` 回显文件名/Hash/说明/拍摄日期/排序，不展示 COS 地址、不加入创作者授权素材包、不在公开 IP 详情或商城显示。提交审核或创建 DCI 代办资料包后，该组资料锁定，收到 `IP_CREATION_PROCESS_VIDEO_LOCKED` 时隐藏编辑/删除操作。
+
 ## 2026-09-28：API-CNT-02 商品/SKU 二级审核已完成
 
 创作者商品接口为 `GET/POST /api/v1/creator/products`、`GET/PATCH /api/v1/creator/products/{productId}` 与下架接口。商品必须绑定本人有效授权及一件 `RIGHTS_CONFIRMED` 作品；自动校验通过后依次进入版权初审、合规复核，合规复核通过才上架。SKU 仅提交规格、价格、库存和 SKU 图，服务端生成 `SKU-{IP资产编号}-{关联作品编号}-{商品编号末6位}-{顺序号}`。已上架商品先下架，修改后新建待审版本；退回、驳回和检测失败版本可直接修改重提。

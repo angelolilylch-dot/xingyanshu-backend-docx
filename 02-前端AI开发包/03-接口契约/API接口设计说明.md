@@ -349,15 +349,15 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
 | GET | `/ips` | 城市运营、版权/合规、管理员、集团只读 | `keyword`、`pageNo`、`pageSize` | 权限范围内 IP 列表；城市运营始终限制本人组织。返回素材包状态、素材包存证状态与冻结时间摘要，不返回完整 Hash |
-| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包；素材项固化文件 Hash、角色、排序、交付标识及范围并生成清单 Hash。勾选代办时同一事务锁定素材清单与 DCI 代办申请；代办与 DCI 证书互斥。 |
-| GET | `/ips/{ipId}` | 有权限角色 | 无 | IP 全量详情；按角色脱敏。确权完成后返回 `rightsEvidence`（确权快照 `hashValue`、存证号、回执号、链上 `transactionHash`、存证时间）、`materialPack`（`manifestHash`、锁定/冻结/素材包存证信息）、`materialItems`（文件 SHA-256、角色、排序、交付范围）和 `dciAssistance` 的锁定申报包 Hash；不返回私有存储键或下载链接 |
+| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 100MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
+| GET | `/ips/{ipId}` | 有权限角色 | 无 | IP 全量详情；按角色脱敏。返回 `creationProcessVideos`（文件 ID、Hash、说明、拍摄日期、锁定时间）或豁免原因；不返回私有存储键或下载链接。确权完成后另返回 `rightsEvidence`、`materialPack`、`materialItems` 和 `dciAssistance` 的锁定申报包 Hash。 |
 | PATCH | `/ips/{ipId}` | 城市运营 | 允许编辑字段、`version` | 仅 `DRAFT`/`SUPPLEMENT_REQUIRED` 且本城市 |
 | POST | `/ips/{ipId}/dci-certificate` | 城市运营 | `certificateNo`、`certificateFileId`、`If-Match-Version`、`Idempotency-Key` | DCI 代办取得证书后的独立回填；只新增证书关联，不修改已经锁定的 IP 内容或素材包 |
 | POST | `/ips/{ipId}/dci-assistance-requests` | 城市运营 | `contactName`、`contactMobile`、`preferredContactTime`、`requestNote`、`idempotencyKey` | 仅用于已保存 IP 后补申请 DCI 代办；创建联系请求，IP 的 DCI 状态改为 `ASSISTANCE_REQUESTED`；不得提交审核 |
 | GET | `/compliance/ips/pending` | 版权/合规 | `keyword`、`dciCertificateStatus`（仅 `UPLOADED`/`VERIFIED`）、分页 | 合规日常主队列；只返回 `PENDING_COMPLIANCE`，给出城市、脱敏权利人、初选方案、评估报告是否已传和 `nextAction` |
 | GET | `/compliance/dci-assistance-requests` | 版权/合规 | `handlingStatus`、`keyword`、分页 | DCI 代办待办；返回完整联系人姓名和手机号，仅合规可读，读取写审计且不得缓存/导出 |
 | POST | `/compliance/dci-assistance-requests/{requestId}/handle` | 版权/合规 | `handlingStatus`、`handlingNote`、`If-Match-Version`、`Idempotency-Key` | 更新 `CONTACTED`/`PROCESSING`/`COMPLETED`/`CLOSED` 及处理轨迹，不代替证书核验 |
-| POST | `/compliance/dci-assistance-requests/{requestId}/application-package` | 版权/合规 | `includeEvaluationReport`、`Idempotency-Key` | 服务端生成私有 ZIP；含代办申请 Markdown、IP 作品说明、权属证明、锁定素材清单 Hash 和全部素材附件，勾选时附带有效评估报告；返回短期 `downloadUrl`，不返回联系人明文 |
+| POST | `/compliance/dci-assistance-requests/{requestId}/application-package` | 版权/合规 | `includeEvaluationReport`、`Idempotency-Key` | 服务端生成私有 ZIP；含代办申请 Markdown、IP 作品说明、权属证明、锁定素材清单 Hash、创作过程视频及全部素材附件，勾选时附带有效评估报告；返回短期 `downloadUrl`，不返回联系人明文 |
 | POST | `/ips/{ipId}/submit` | 城市运营 | `comment`、`If-Match-Version`、`Idempotency-Key` | 仅 DCI 已上传且资料完整、文字检测通过时进入 `PENDING_COMPLIANCE` |
 | POST | `/ips/{ipId}/dci-verifications` | 版权/合规 | `result`（`PASS`/`RETURN`）、`comment`、版本、幂等键 | 通过仅使 DCI 变为 `VERIFIED`；退回将 IP 转为 `SUPPLEMENT_REQUIRED` |
 | POST | `/ips/{ipId}/rights-reviews` | 版权/合规 | `result`（`CONFIRM`/`RETURN`）、`comment`、`supplementItems`、确认时最终 `suggestedTransactionPriceAmount`、最终 `authPlanVersionId/distributionTemplateId/distributionItems`、版本、幂等键 | 退回理由必填；确认时交易价必填并锁定；确认前 DCI 必须已核验，商城资料和方案条件满足。成功返回 `evidenceReceiptNo` 与可展示的 `evidenceTransactionHash`，随后直接进入 `LISTED` |
@@ -719,6 +719,11 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `CREATOR_SUSPENDED` | 403 | 创作者账号已停用 | 禁止新增操作，提示平台联系渠道 |
 | `IP_NOT_LISTED` | 422 | IP 未上架、暂停、下架、失效或商城隐藏 | 刷新商城，不允许购买 |
 | `IP_DCI_CERTIFICATE_REQUIRED` | 422 | 提交 IP 审核时未上传 DCI 版权证书编号或文件 | 停留在编辑页，补齐 DCI 证书；已申请代办时等待线下代办完成后补传 |
+| `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 原始创作 IP 未上传创作过程视频 | 定位到创作过程视频区，上传至少 1 段私有 MP4 |
+| `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 非原始创作 IP 未上传视频且未填写原因 | 显示“无法提供原因”输入框并要求填写 |
+| `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 视频不是 MP4 | 重新选择 MP4 文件 |
+| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 100MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
+| `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 已提交审核或已申请 DCI 代办后尝试替换视频 | 展示已锁定状态；按退回补充或新建入库记录处理 |
 | `IP_DCI_CERTIFICATE_NOT_VERIFIED` | 422 | 尝试确权或上架时 DCI 证书未通过版权/合规核验 | 展示核验状态和补充要求，不允许继续流转 |
 | `IP_RIGHTS_NOT_CONFIRMED` | 422 | IP 未完成确权或材料/存证条件不满足 | 不允许上架、购买或绑定后续业务 |
 | `IP_MAIN_CITY_LOCKED` | 422 | 已确权 IP 尝试修改主归属城市 | 禁止编辑，走异常处置流程 |
@@ -792,7 +797,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 | 接口动作 | 必须满足的状态/条件 | 拒绝时主要错误码 |
 | --- | --- | --- |
-| 提交 IP 审核 | IP 为 `DRAFT` 或 `SUPPLEMENT_REQUIRED`，城市运营本城市，材料与方案完整且 DCI 已上传 | `STATE_TRANSITION_NOT_ALLOWED`、`IP_DCI_CERTIFICATE_REQUIRED` |
+| 提交 IP 审核 | IP 为 `DRAFT` 或 `SUPPLEMENT_REQUIRED`，城市运营本城市，材料与方案完整、创作过程视频或有效豁免原因已锁定且 DCI 已上传 | `STATE_TRANSITION_NOT_ALLOWED`、`IP_CREATION_PROCESS_VIDEO_REQUIRED`、`IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED`、`IP_DCI_CERTIFICATE_REQUIRED` |
 | IP 确权 | IP 为 `PENDING_COMPLIANCE`，版权/合规审核通过且 DCI 已核验 | `STATE_TRANSITION_NOT_ALLOWED`、`IP_DCI_CERTIFICATE_NOT_VERIFIED` |
 | IP 自动上架 | IP 为 `PENDING_COMPLIANCE`，确权通过、DCI 已核验、绑定方案已启用、关键材料存证成功、商城字段完整 | `IP_DCI_CERTIFICATE_NOT_VERIFIED`、`EVIDENCE_RECEIPT_MISSING` |
 | 创建授权订单 | 创作者账号正常、实名已认证、IP 已上架、名额可用、无有效同 IP 授权 | `CREATOR_IDENTITY_REQUIRED`、`AUTHORIZATION_QUOTA_SOLD_OUT`、`AUTHORIZATION_ALREADY_ACTIVE` |

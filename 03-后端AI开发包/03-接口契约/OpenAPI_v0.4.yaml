@@ -418,7 +418,7 @@ paths:
     post:
       tags: [IP与方案]
       summary: 城市运营保存 IP
-      description: 勾选 dciAssistanceRequested 时，服务端在同一事务保存 IP 和 DCI 代办申请；不得与 DCI 证书编号或文件同时提交。
+      description: 原始创作须上传至少一段私有创作过程 MP4；其他权利取得方式可上传视频或填写豁免原因。勾选 dciAssistanceRequested 时，服务端在同一事务保存 IP、锁定创作过程视频和 DCI 代办申请；不得与 DCI 证书编号或文件同时提交。
       x-roles: [城市运营]
       x-data-scope: 仅允许写入本人所属城市
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
@@ -429,6 +429,7 @@ paths:
       tags: [IP与方案]
       description: 版权合规人员与平台管理员可返回授权范围内 IP 的完整敏感字段；城市运营者仅对所属城市 IP 返回完整字段。其他可访问角色仅返回 `*Masked` 脱敏字段；明文字段沿用原字段名。
       summary: 获取 IP 详情（按角色脱敏）
+      x-success-response-fields: [id, ipNo, status, version, rightHolder, creationProcessVideos, creationProcessVideoExemptionReason, materialPack, materialItems]
       x-roles: [城市运营, 版权合规, 平台管理员, 集团管理层]
       parameters: [ { name: ipId, in: path, required: true, schema: { type: string } } ]
       responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
@@ -499,7 +500,7 @@ paths:
     post:
       tags: [IP与方案]
       summary: 打包下载 DCI 代办申请资料
-      description: 仅版权合规可调用。系统生成私有 ZIP，内含代办申请 Markdown、IP 作品说明、权属证明和作品附件；可选附带评估报告。响应只返回短期下载地址，不返回联系人明文。
+      description: 仅版权合规可调用。系统生成私有 ZIP，内含代办申请 Markdown、IP 作品说明、权属证明、作品附件及已锁定创作过程视频；可选附带评估报告。响应只返回短期下载地址，不返回联系人明文。
       x-roles: [版权合规]
       x-idempotency: required
       parameters: [ { name: requestId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
@@ -1747,6 +1748,18 @@ components:
         suggestedTransactionPriceAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$', description: IP建议交易价；确权确认时锁定 }
         coverFileId: { type: string, description: 封面图；提交审核时按展示规则必填 }
         detailFileIds: { $ref: '#/components/schemas/FileIdList' }
+        creationProcessVideos:
+          type: array
+          maxItems: 3
+          description: 私有创作过程审核证据；仅MP4，单段及全部视频合计均不超过100MB。不进入授权素材包、商城或消费者端。
+          items:
+            type: object
+            required: [fileId, description]
+            properties:
+              fileId: { type: string, description: 已上传完成的私有MP4文件ID }
+              description: { type: string, maxLength: 500, description: 视频与本IP的关联及关键创作过程说明 }
+              recordedAt: { type: string, format: date, description: 可选拍摄日期 }
+        creationProcessVideoExemptionReason: { type: string, maxLength: 500, description: rightHolder.acquisitionMethod 非 ORIGINAL_CREATION 且未上传视频时必填；与creationProcessVideos互斥，交由版权合规人工核验 }
         rightHolder: { type: object, required: [holderType, holderName, acquisitionMethod, rightsDescription], properties: { holderType: { type: string, enum: [PERSONAL, ENTERPRISE, INSTITUTION, COLLECTIVE] }, holderName: { type: string }, acquisitionMethod: { type: string, enum: [ORIGINAL_CREATION, TRANSFER, LICENSE, INHERITANCE, ENTRUSTED_MANAGEMENT, OTHER] }, rightsDescription: { type: string, maxLength: 10000 } } }
         rightDocuments: { type: array, minItems: 1, items: { type: object, required: [documentType, documentNo, fileId], properties: { documentType: { type: string }, documentNo: { type: string, maxLength: 128 }, validFrom: { type: string, format: date }, validTo: { type: string, format: date }, fileId: { type: string } } } }
         materialPack: { $ref: '#/components/schemas/MaterialPackInput' }
