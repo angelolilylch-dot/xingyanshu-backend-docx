@@ -278,7 +278,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/tags` | 后台已登录 | `tagType`、`keyword` | 已启用标签 ID、名称、类型、状态 |
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
-| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | 密钥不经接口读写，仅私有配置文件管理 |
+| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | `PLATFORM_RETURN_ADDRESS` 使用 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填；保存后新建售后单立即取该值并写入快照。密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | 商品/活动规则 JSON、退货费用承担方、启停原因 | 原模板不可编辑；新版本自动停用旧版本 |
 | GET | `/creator/after-sale-templates` | 创作者 | 必填 `bizType=PRODUCT|ACTIVITY`；兼容 `pageNo/pageSize` | 仅返回启用且有效的模板，供商品/活动表单下拉；不允许维护模板 |
 
@@ -592,12 +592,12 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 | 方法 | 路径 | 角色 | 请求字段 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
-| POST | `/consumer/after-sales/product` | 消费者 | `orderId`、`orderItemId`、`afterSaleType`、`reasonCode`、`reasonText`、`evidenceFileIds`、`idempotencyKey` | 售后单、状态、退货地址摘要 | 商品仅取消退款/退货退款 |
-| POST | `/consumer/after-sales/activity` | 消费者 | `bookingId`、`reasonCode`、`reasonText`、`evidenceFileIds`、`idempotencyKey` | 售后单、状态 | 已核销/已过期拒绝 |
-| GET | `/consumer/after-sales` | 消费者 | `status`、`bizType`、分页 | 本人售后列表 |
-| GET | `/consumer/after-sales/{afterSaleId}` | 消费者本人、处理角色 | 无 | 规则快照、处理轨迹、退货地址、退款/冲销状态 |
-| POST | `/consumer/after-sales/{afterSaleId}/withdraw` | 消费者本人 | `reason`、`version` | 已撤销 | 仅客服未处理时 |
-| POST | `/consumer/after-sales/{afterSaleId}/return-logistics` | 消费者本人 | `carrierCode`、`trackingNo`、`shippedAt`、`version` | 待确认售后 | 仅退货中 |
+| POST | `/consumer/after-sales/product` | 消费者 | `productOrderId`、`productOrderItemId`、`afterSaleType`、`applyQuantity`、`reasonCode`、`reasonText`、`evidenceFileIds`；`Idempotency-Key` | `afterSaleId/status/applyAmount/applyQuantity` | 待发货仅取消退款；已发货/签收/完成可退货退款；同一订单项不可并行；金额为申请商品金额，不含后续财务核定 |
+| POST | `/consumer/after-sales/activity` | 消费者 | `activityBookingId`、`reasonCode`、`reasonText`、`evidenceFileIds`；`Idempotency-Key` | `afterSaleId/status/applyAmount` | 仅待核销且所属场次开始前；仅取消退款 |
+| GET | `/consumer/after-sales` | 消费者 | `status`（可选） | `items/total` | 仅返回本人售后单 |
+| GET | `/consumer/after-sales/{afterSaleId}` | 消费者本人 | 无 | 规则快照、凭证、物流、退款状态 | 固定退货地址仅在 `RETURNING` 或 `PENDING_RECEIPT_CONFIRMATION` 回显 |
+| POST | `/consumer/after-sales/{afterSaleId}/withdraw` | 消费者本人 | `Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=WITHDRAWN` | 仅 `PENDING_REVIEW`；恢复申请前订单/预约状态 |
+| POST | `/consumer/after-sales/{afterSaleId}/return-logistics` | 消费者本人 | `carrierCode`、`trackingNo`、`shippedAt`；`Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=PENDING_RECEIPT_CONFIRMATION` | 仅 `RETURNING` 商品售后单；同一运单不可重复使用 |
 | GET | `/fulfillment/after-sales` | 履约客服 | `status`、`bizType`、日期范围、分页 | 待审核/退货中/待确认队列 |
 | POST | `/fulfillment/after-sales/{afterSaleId}/review` | 履约客服 | `result`、`comment`、`returnFeeBearer`、`suggestedRefundAmount`、`version` | 最新售后状态 | 商品：同意仅退款/退货退款/驳回；活动：同意退款/驳回 |
 | POST | `/fulfillment/after-sales/{afterSaleId}/return-receipt-confirmation` | 履约客服 | `receiptResult`、`conditionResult`、`evidenceFileIds`、`comment`、`version` | 进入退款处理中 | 仅待确认 |
@@ -639,11 +639,15 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/files` | 已登录后台账号 | multipart `file` | `id`、`fileNo`、`originalName`、`mimeType`、`fileSize`、`fileHash`、`securityLevel`、`uploadStatus` | 只接受配置白名单格式；先校验大小/MIME，再上传 COS；返回 `201` |
 | GET | `/files/{fileId}` | 上传者本人或平台管理员 | 无 | 文件元数据、可访问状态 | 不返回 `storageKey`、COS Bucket 或密钥 |
 | POST | `/files/{fileId}/download-url` | 上传者本人或平台管理员 | 无 | 短期 `downloadURL`、`expiresAt` | 默认 10 分钟；每次签发写审计 |
-| GET | `/evidence-records` | 管理员；合规/财务/集团按范围只读 | `objectType`、`objectId`、`status`、分页 | 存证编号、Hash、链平台、状态、回执、失败摘要 |
-| POST | `/admin/evidence-records/{evidenceId}/retry` | 平台管理员 | `reason`、`idempotencyKey` | 重试任务状态 | 不得手工伪造成功 |
-| POST | `/integrations/evidence/callbacks` | 链服务 | 签名、请求号、回执号、链上交易/存证哈希、结果、时间 | 接收结果 | 验签、幂等、记录重试/回执；成功回调必须同时提供回执号和交易/存证哈希 |
+| GET | `/evidence-records` | 管理员；合规/财务/集团按范围只读 | `objectType`、`objectId`、`status`、分页 | **规划中，尚未注册路由**；未来返回存证编号、Hash、链平台、状态、回执、失败摘要 |
+| POST | `/admin/evidence-records/{evidenceId}/retry` | 平台管理员 | `reason`、`idempotencyKey` | **规划中，尚未注册路由**；不得手工伪造成功 |
+| POST | `/integrations/evidence/callbacks` | 链服务 | 签名、请求号、回执号、链上交易/存证哈希、结果、时间 | 现有通用回调入口；至信链采用主动查询，不依赖此回调 |
 
-### 12.2 敏感内容检测与审计
+### 12.2 至信链证书（前端交接边界）
+
+至信链的 `/api/v1/ev/save`、`/api/v1/ev/query`、`/api/v1/ev/cert` 均由后端内部调用，前端不得直连。后端会保存证书状态和 `certUrl`；未来新增受权查询接口后，前端只接收 `certificateStatus`、`certificateUrl`、`updatedAt`，且仅在 `certificateStatus=READY` 时展示“查看链上证书”。当前该平台查询接口尚未注册，不能以厂商地址替代。
+
+### 12.3 敏感内容检测与审计
 
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据 |
 | --- | --- | --- | --- | --- |
@@ -652,7 +656,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/exports` | 有导出权限角色 | `objectType`、`scope`、`maskLevel`、`reason` | 导出任务编号、状态 | 全部导出留痕 |
 | GET | `/exports/{exportId}` | 导出申请人/管理员 | 无 | 状态、文件下载短链、过期时间 |
 
-### 12.3 经营看板
+### 12.4 经营看板
 
 | 方法 | 路径 | 角色 | 请求参数 | 返回数据 |
 | --- | --- | --- | --- | --- |
@@ -672,9 +676,9 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 文件存储 | `FileStorage.Put/GetSignedURL` | 文件流、权限、用途 | 存储键、Hash、短期 URL | 不暴露长期真实地址 |
 | 物流 | `LogisticsProvider.Query/VerifyCallback` | 运单、承运商、回调数据 | 轨迹、签收、事件号 | 回调幂等；异常记录待处理 |
 | 支付 | `PaymentProvider.Initiate/Query/Close/Refund` | 业务订单、金额、幂等键 | 微信支付 V3 流水、H5 支付链接、支付/退款状态 | 测试 Mock；生产微信支付 V3；未来可新增数字人民币实现 |
-| 存证 | `EvidenceProvider.Submit/Query` | 对象、Hash、请求号 | 存证号、回执、状态 | 无回执不得标记成功；保留重试 |
+| 存证 | 后端 `EvidenceProvider` | 对象、Hash、请求号、`evId` | 存证状态、证书状态、受控 `certUrl` | 至信链由后端调用；前端不持有厂商配置或签名 |
 
-当前已配置的文本检测服务为腾讯云 TMS：地域 `ap-guangzhou`、策略 `ip_center`、接口 `TextModeration`。每次业务提交由后端生成不含个人信息的 `DataId`；文本只在调用时传给腾讯云，业务库仅保存文本 Hash、腾讯 `RequestId`、结论和风险标签。存证链服务商尚未确定，现有 `EvidenceProvider` 仅定义提交/查询边界；未配置真实服务时返回失败，绝不生成模拟成功回执。
+当前已配置的文本检测服务为腾讯云 TMS：地域 `ap-guangzhou`、策略 `ip_center`、接口 `TextModeration`。每次业务提交由后端生成不含个人信息的 `DataId`；文本只在调用时传给腾讯云，业务库仅保存文本 Hash、腾讯 `RequestId`、结论和风险标签。至信链真实 Provider 已实现；前端侧没有厂商直调接口，证书展示需等待受权查询接口交付。
 
 ## 14. API 错误码与权限矩阵
 

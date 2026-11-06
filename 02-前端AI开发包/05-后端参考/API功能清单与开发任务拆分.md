@@ -62,16 +62,16 @@
 | API-FND-02 | 通用响应、错误码、幂等、状态与审计基座 | P0 | 公共 | API-FND-01 | 已完成 |
 | API-FND-03 | 字典、标签、系统配置与固定规则模板 | P0 | 8 | API-FND-01 | 已完成 |
 | API-FND-04 | 文件上传、权限下载与文件关联 | P0 | 3 | API-FND-01 | 已完成 |
-| API-FND-05 | 外部服务适配器与安全回调框架 | P0 | 内部 | API-FND-01、API-FND-04 | 测试环境完成（TMS 真实；存证 Mock；真实链待服务商） |
+| API-FND-05 | 外部服务适配器与安全回调框架 | P0 | 内部 | API-FND-01、API-FND-04 | 已完成基础框架；至信链真实存证与证书流程由 API-FND-05-R3 承接并已联调 |
 | API-ID-01 | 创作者实名、委托书草稿/留存与账号状态 | P0 | 8 | API-FND-01、API-FND-04、API-FND-05 | 已完成（短信/实名 Mock；企业/工作室 Word 草稿自动生成） |
 | API-IP-01 | IP 录入、编辑、提交与查询 | P0 | 6 | API-SYS-02、API-FND-03、API-FND-04 | 已完成 |
-| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（测试环境 Mock 存证） |
+| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（业务测试曾使用 Mock；运行时可配置至信链真实 Provider） |
 | API-IP-03 | 授权方案与分配方案配置审核 | P0 | 10 | API-FND-03 | 已完成 |
 | API-AUT-01 | 创作者 IP 商城与购买预览 | P0 | 3 | API-IP-02、API-IP-03、API-ID-01 | 已完成 |
 | API-AUT-02 | 授权待支付订单、取消与名额预占 | P0 | 3 | API-AUT-01、API-FND-02 | 已完成 |
 | API-AUT-03 | 测试 Mock 支付、授权生效、合同凭证与存证补偿 | P0 | 6 | API-AUT-02、API-FND-04、API-FND-05 | 已完成（生产微信支付另属 API-FND-05-R1） |
 | API-AUT-04 | 授权素材包与下载权限 | P0 | 2 | API-AUT-03、API-FND-04 | 已完成（订单素材 Hash 快照、冻结/存证/授权下载与下载留痕） |
-| API-CNT-01 | 二创作品提交、审核与确权 | P0 | 7 | API-AUT-04、API-FND-05 | 已完成（提交、文本检测、两级审核、退回新版本、确权快照与 Mock 存证） |
+| API-CNT-01 | 二创作品提交、审核与确权 | P0 | 7 | API-AUT-04、API-FND-05 | 已完成（提交、文本检测、两级审核、退回新版本、确权快照；运行时可配置至信链真实 Provider） |
 | API-CNT-02 | 商品提交、自动校验、发布与上下架 | P0 | 6 | API-CNT-01、API-FND-05 | 已完成：商品/SKU、自动检测记录、二级审核、下架新版本及真实 MySQL 验收 |
 | API-CNT-03 | 活动提交、自动校验、暂停与下架 | P0 | 6 | API-AUT-04、API-FND-05 | 已完成：活动/场次/固定票种、授权范围与地区校验、文本检测自动发布、暂停/恢复/下架、自动结束及真实 MySQL 回归 |
 | API-H5-01 | H5 公开浏览与客服信息 | P0 | 8 | API-CNT-02、API-CNT-03 | 已完成：匿名商品/活动浏览、稳定公开展示图、暂停报名活动展示、客服信息及真实 MySQL HTTP 回归 |
@@ -79,7 +79,7 @@
 | API-H5-03 | 活动预约、免费票与核销码展示 | P0 | 6 | API-FND-01、API-CNT-03 | 待开发 |
 | API-FUL-01 | 发货、物流、签收与自动确认 | P0 | 4 | API-H5-02、API-FND-05 | **已完成：** 平台履约发货、物流轮询落库、签收、消费者查询/确认收货、签收 7 天自动确认；回调入口与创作者自行发货后续实现 |
 | API-FUL-02 | 现场核销与活动订单完成 | P0 | 3 | API-H5-03 | 待开发 |
-| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 待开发 |
+| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 已完成；固定退货地址后台配置已接入，真实 MySQL HTTP 回归通过 |
 | API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 待开发 |
 | API-FIN-01 | 收款账户、自动分账、冻结与解冻 | P0 | 7 | API-FUL-01、API-FUL-02、API-AFS-02 | 待开发 |
 | API-FIN-02 | 结算异议、结算批次与线下付款 | P0 | 7 | API-FIN-01、API-FND-04 | 待开发 |
@@ -146,13 +146,13 @@
 
 ### API-FND-05 外部服务适配器与安全回调框架
 
-- **当前阶段范围与状态：** 部分完成。只交付腾讯云文本内容安全真实 Adapter 和存证 Provider 框架；短信、实名、支付、电子签章、物流及其回调延后到对应业务模块开发。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
-- **接口范围：** 内部 `ContentSafetyProvider`（已完成，腾讯云 TMS `TextModeration`）与 `EvidenceProvider`（框架已完成，真实链服务商待确定）；存证回调 `POST /integrations/evidence/callbacks` 待链服务商确定签名规范后实现。
-- **主写表：** 后续 IP 业务调用时写 `content_detection_record`、`evidence_record`、`evidence_retry_log`；当前适配器本身不提供前端可调用路由，也不伪造业务记录。
+- **当前阶段范围与状态：** 已完成腾讯云文本内容安全真实 Adapter 和至信链真实存证/证书 Provider；短信、实名、支付、电子签章、物流及其回调按对应业务模块推进。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
+- **接口范围：** 内部 `ContentSafetyProvider`（腾讯云 TMS `TextModeration`）与 `EvidenceProvider.Submit/Query/RequestCertificate/QueryCertificate`（至信链）。至信链采用后端主动查询；前端不调用厂商接口。
+- **主写表：** 存证业务写 `content_detection_record`、`evidence_record`、`evidence_certificate`、`evidence_retry_log`；当前适配器本身不提供前端可调用路由，也不伪造业务记录。
 - **关联校验表：** `sys_config`、`file_object`、所有受检测/存证对象。
-- **异步/联动表：** `sys_audit_log`、存证失败重试队列（在 IP 确权模块接入）。
+- **异步/联动表：** `sys_audit_log`、存证失败重试队列和证书轮询队列；`certUrl` 待受权查询接口交付后供前端展示。
 - **核心实现：** 腾讯云 TMS 使用 `BizType=ip_center`、`ap-guangzhou` 和同步 `TextModeration`；`Pass` 映射为 `PASS`，`Review` 或未知建议映射为 `REVIEW`，`Block` 映射为 `BLOCK`。业务文本、命中词和密钥不写普通日志。存证只有收到真实服务的可验证回执且状态为 `SUCCESS` 才可推进业务状态。
-- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。
+- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；至信链已通过真实租户验证存证提交/查询、证书创建/查询。敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。
 
 ## 5. IP 与授权方案任务
 
@@ -314,6 +314,8 @@
 
 ### API-AFS-01 消费者售后申请、撤回与退货物流
 
+- **实现状态：** 已完成。平台管理员使用 `PLATFORM_RETURN_ADDRESS` 维护统一退货地址；新售后单立即取值并锁定快照，YAML 仅在尚未配置时兜底。
+- **权限边界：** 消费者申请/撤回/寄回物流；履约客服菜单与 `FULFILLMENT_AFTER_SALE_MANAGE` 已预置，但审核、收货确认与退款仍属于 API-AFS-02。
 - **接口范围：** `POST /consumer/after-sales/product`、`POST /consumer/after-sales/activity`、`GET /consumer/after-sales`、`GET /consumer/after-sales/{afterSaleId}`、`POST /consumer/after-sales/{afterSaleId}/withdraw`、`POST /consumer/after-sales/{afterSaleId}/return-logistics`。
 - **主写表：** `after_sale_ticket`、`after_sale_evidence`、`return_logistics`。
 - **关联校验表：** `product_order`、`product_order_item`、`activity_booking`、`after_sale_rule_template`、`delivery_order`、`verification_record`、`file_object`。

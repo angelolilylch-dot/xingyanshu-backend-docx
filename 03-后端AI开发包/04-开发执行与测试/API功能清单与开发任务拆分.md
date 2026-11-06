@@ -62,16 +62,16 @@
 | API-FND-02 | 通用响应、错误码、幂等、状态与审计基座 | P0 | 公共 | API-FND-01 | 已完成 |
 | API-FND-03 | 字典、标签、系统配置与固定规则模板 | P0 | 8 | API-FND-01 | 已完成 |
 | API-FND-04 | 文件上传、权限下载与文件关联 | P0 | 3 | API-FND-01 | 已完成 |
-| API-FND-05 | 外部服务适配器与安全回调框架 | P0 | 内部 | API-FND-01、API-FND-04 | 测试环境完成（TMS 真实；存证 Mock；真实链待服务商） |
+| API-FND-05 | 外部服务适配器与安全回调框架 | P0 | 内部 | API-FND-01、API-FND-04 | 已完成基础框架；至信链真实存证与证书流程由 API-FND-05-R3 承接并已联调 |
 | API-ID-01 | 创作者实名、委托书草稿/留存与账号状态 | P0 | 8 | API-FND-01、API-FND-04、API-FND-05 | 已完成（短信/实名 Mock；企业/工作室 Word 草稿自动生成） |
 | API-IP-01 | IP 录入、编辑、提交与查询 | P0 | 6 | API-SYS-02、API-FND-03、API-FND-04 | 已完成 |
-| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（测试环境 Mock 存证） |
+| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（业务测试曾使用 Mock；运行时可配置至信链真实 Provider） |
 | API-IP-03 | 授权方案与分配方案配置审核 | P0 | 10 | API-FND-03 | 已完成 |
 | API-AUT-01 | 创作者 IP 商城与购买预览 | P0 | 3 | API-IP-02、API-IP-03、API-ID-01 | 已完成 |
 | API-AUT-02 | 授权待支付订单、取消与名额预占 | P0 | 3 | API-AUT-01、API-FND-02 | 已完成 |
 | API-AUT-03 | 测试 Mock 支付、授权生效、合同凭证与存证补偿 | P0 | 6 | API-AUT-02、API-FND-04、API-FND-05 | 已完成（生产微信支付另属 API-FND-05-R1） |
 | API-AUT-04 | 授权素材包与下载权限 | P0 | 2 | API-AUT-03、API-FND-04 | 已完成（订单素材 Hash 快照、冻结/存证/授权下载与下载留痕） |
-| API-CNT-01 | 二创作品提交、审核与确权 | P0 | 7 | API-AUT-04、API-FND-05 | 已完成（提交、文本检测、两级审核、退回新版本、确权快照与 Mock 存证） |
+| API-CNT-01 | 二创作品提交、审核与确权 | P0 | 7 | API-AUT-04、API-FND-05 | 已完成（提交、文本检测、两级审核、退回新版本、确权快照；运行时可配置至信链真实 Provider） |
 | API-CNT-02 | 商品提交、自动校验、发布与上下架 | P0 | 6 | API-CNT-01、API-FND-05 | 已完成：商品/SKU、自动检测记录、二级审核、下架新版本及真实 MySQL 验收 |
 | API-CNT-03 | 活动提交、自动校验、暂停与下架 | P0 | 6 | API-AUT-04、API-FND-05 | 已完成：活动/场次/固定票种、授权范围与地区校验、文本检测自动发布、暂停/恢复/下架、自动结束及真实 MySQL 回归 |
 | API-H5-01 | H5 公开浏览与客服信息 | P0 | 8 | API-CNT-02、API-CNT-03 | 已完成：匿名商品/活动浏览、稳定公开展示图、暂停报名活动展示、客服信息及真实 MySQL HTTP 回归 |
@@ -79,7 +79,7 @@
 | API-H5-03 | 活动预约、免费票与核销码展示 | P0 | 6 | API-FND-01、API-CNT-03 | 待开发 |
 | API-FUL-01 | 发货、物流与签收 | P0 | 4 | API-H5-02、API-FND-05 | 已完成；物流回调入口改为后续兼容项 |
 | API-FUL-02 | 现场核销与活动订单完成 | P0 | 3 | API-H5-03 | 待开发 |
-| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 待开发 |
+| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 已完成；真实 MySQL HTTP 集成回归通过 |
 | API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 待开发 |
 | API-FIN-01 | 收款账户、自动分账、冻结与解冻 | P0 | 7 | API-FUL-01、API-FUL-02、API-AFS-02 | 待开发 |
 | API-FIN-02 | 结算异议、结算批次与线下付款 | P0 | 7 | API-FIN-01、API-FND-04 | 待开发 |
@@ -146,13 +146,13 @@
 
 ### API-FND-05 外部服务适配器与安全回调框架
 
-- **当前阶段范围与状态：** 部分完成。已交付腾讯云文本内容安全真实 Adapter、存证 Provider 框架，以及供 API-FUL-01 调用的腾讯云云市场物流查询 Adapter；短信、支付、电子签章及物流回调仍在对应业务模块开发。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
-- **接口范围：** 内部 `ContentSafetyProvider`（已完成，腾讯云 TMS `TextModeration`）、`EvidenceProvider`（框架已完成，真实链服务商待确定）及 `LogisticsProvider.Query`（已完成，腾讯云云市场快递查询）；存证回调 `POST /integrations/evidence/callbacks` 和物流回调待对应服务商签名规范及业务路由确定后实现。
-- **主写表：** 后续 IP 业务调用时写 `content_detection_record`、`evidence_record`、`evidence_retry_log`；当前适配器本身不提供前端可调用路由，也不伪造业务记录。
+- **当前阶段范围与状态：** 已完成腾讯云文本内容安全真实 Adapter、至信链真实存证/证书 Provider，以及供 API-FUL-01 调用的腾讯云云市场物流查询 Adapter；短信、支付、电子签章及物流回调仍在对应业务模块开发。文件存储已由 API-FND-04 接入真实腾讯云 COS 私有测试桶。
+- **接口范围：** 内部 `ContentSafetyProvider`（腾讯云 TMS `TextModeration`）、`EvidenceProvider.Submit/Query/RequestCertificate/QueryCertificate`（至信链）及 `LogisticsProvider.Query`。至信链使用主动查询，通用存证回调 `POST /integrations/evidence/callbacks` 不参与其证书流程。
+- **主写表：** 存证业务写 `content_detection_record`、`evidence_record`、`evidence_certificate`、`evidence_retry_log`；适配器本身不提供前端可调用路由，也不伪造业务记录。
 - **关联校验表：** `sys_config`、`file_object`、所有受检测/存证对象。
-- **异步/联动表：** `sys_audit_log`、存证失败重试队列（在 IP 确权模块接入）。
+- **异步/联动表：** `sys_audit_log`、存证失败重试队列和证书请求/查询队列；成功存证由 Worker 自动补建证书任务并轮询。
 - **核心实现：** 腾讯云 TMS 使用 `BizType=ip_center`、`ap-guangzhou` 和同步 `TextModeration`；`Pass` 映射为 `PASS`，`Review` 或未知建议映射为 `REVIEW`，`Block` 映射为 `BLOCK`。物流 Adapter 请求 `https://ap-guangzhou.cloudmarket-apigw.com/service-d2zdkymg/express/query`，使用 `code=auto`、`no`、`tel`（后四位）及云市场 HMAC-SHA1 `Authorization`；`code="0"` 为成功，`logisticsStatus="SIGN"` 为签收，轨迹时间为毫秒。物流密钥只从 `XINGYANSHU_LOGISTICS_SECRET_ID`、`XINGYANSHU_LOGISTICS_SECRET_KEY` 读取。业务文本、命中词、运单完整手机号和密钥不写普通日志。存证只有收到真实服务的可验证回执且状态为 `SUCCESS` 才可推进业务状态。
-- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；物流 Adapter 已使用真实圆通运单返回派送中状态和 9 条轨迹，且未记录密钥或完整个人信息；敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。
+- **验收：** 已通过真实腾讯云测试凭据完成正常中文文本检测；物流 Adapter 已使用真实圆通运单返回派送中状态和 9 条轨迹，且未记录密钥或完整个人信息；至信链已通过真实租户验证存证提交/查询、证书创建/查询。敏感检测超时或异常必须阻断提交；未配置真实链服务或无回执时不得标记存证成功。`certUrl` 仅写入 `evidence_certificate`，待后续受权查询接口提供给前端展示。
 
 ## 5. IP 与授权方案任务
 
@@ -318,6 +318,12 @@
 
 ### API-AFS-01 消费者售后申请、撤回与退货物流
 
+- **实现状态：** 已完成。消费者仅可操作本人售后单；所有写接口均要求 `Idempotency-Key`，撤回与寄回物流另要求 `If-Match-Version`。
+- **商品规则：** 支持订单明细按 `applyQuantity` 部分申请；`PENDING_SHIPMENT` 只允许 `CANCEL_REFUND`，`SHIPPED`、`SIGNED`、`COMPLETED` 可按模板申请 `RETURN_REFUND`；同一明细仅允许一笔处理中售后。
+- **活动规则：** 仅 `PENDING_VERIFICATION` 且场次开始前支持 `CANCEL_REFUND`；不支持改期或退货物流。
+- **地址规则：** 平台管理员通过“平台配置”维护 `PLATFORM_RETURN_ADDRESS` JSON；创建申请时读取该配置并写入私有快照，未配置时使用部署 YAML 兜底。消费者仅在客服同意退货、状态进入 `RETURNING` 后才能读取。
+- **权限预置：** 履约客服拥有菜单 `MENU_FULFILLMENT_AFTER_SALE` 与操作权限 `FULFILLMENT_AFTER_SALE_MANAGE`；当前不开放审核按钮，待 API-AFS-02 路由上线后强制校验该权限。
+- **边界：** 审核、退款、库存/名额恢复及分账冲销尚未实现，统一由 `API-AFS-02` 处理。
 - **接口范围：** `POST /consumer/after-sales/product`、`POST /consumer/after-sales/activity`、`GET /consumer/after-sales`、`GET /consumer/after-sales/{afterSaleId}`、`POST /consumer/after-sales/{afterSaleId}/withdraw`、`POST /consumer/after-sales/{afterSaleId}/return-logistics`。
 - **主写表：** `after_sale_ticket`、`after_sale_evidence`、`return_logistics`。
 - **关联校验表：** `product_order`、`product_order_item`、`activity_booking`、`after_sale_rule_template`、`delivery_order`、`verification_record`、`file_object`。
