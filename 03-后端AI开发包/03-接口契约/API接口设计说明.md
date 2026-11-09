@@ -642,11 +642,11 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/admin/evidence-records/{evidenceId}/retry` | 平台管理员 | `reason`、`idempotencyKey` | **规划中，尚未注册路由**；不得手工伪造成功 |
 | POST | `/integrations/evidence/callbacks` | 链服务 | 签名、请求号、回执号、链上交易/存证哈希、结果、时间 | 现有通用回调入口；至信链采用主动查询，不依赖此回调 |
 
-### 12.2 至信链证书（后端内部调用；前端查询待新增）
+### 12.2 至信链证书与创作者端受权查询
 
 已实现的 `ZXChainProvider` 依次调用厂商 `POST /api/v1/ev/save`、`GET /api/v1/ev/query`、`POST /api/v1/ev/cert`、`GET /api/v1/ev/cert`；它们均不属于星衍树开放 API。成功存证的 `evId`、交易号和区块高度分别持久化到 `evidence_record`，证书异步状态和 `certUrl` 持久化到 `evidence_certificate`。
 
-前端未来需要显示证书时，应新增星衍树受权查询接口（接口路径、角色和对象数据范围尚待接口任务确认），返回受控字段 `certificateStatus`、`certificateUrl`、`updatedAt`。只有 `certificateStatus=READY` 才可返回非空 `certificateUrl`；游客、无该业务对象读取权限的用户以及所有前端代码均不得直接调用至信链地址或获得签名材料。当前无此平台路由，前端不得以厂商 `/api/v1/ev/cert` 替代。
+已注册 `GET /api/v1/creator/evidences/{evidenceId}/certificate`。接口仅接受创作者 JWT，并通过业务归属校验仅允许访问本人 `AUTH_CONTRACT`（授权合同）和 `DERIVATIVE_WORK`（二创作品）存证；无权与不存在统一为 `404 RESOURCE_NOT_FOUND`。成功响应返回 `evidenceId`、业务对象/存证元数据及 `certificate.status`、`provider`、`providerStatus`、`certUrl`、`reasonCode`。只有 `certificate.status=READY` 才返回非空 `certUrl`；游客、无权用户及前端代码均不得直接调用至信链地址或获得签名材料。
 
 ### 12.3 敏感内容检测与审计
 
@@ -679,7 +679,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 支付 | `PaymentProvider.Initiate/Query/Close/Refund` | 业务订单、金额、幂等键 | 微信支付 V3 流水、H5 支付链接、支付/退款状态 | 测试 Mock；生产微信支付 V3；未来可新增数字人民币实现 |
 | 存证 | `EvidenceProvider.Submit/Query/RequestCertificate/QueryCertificate` | 对象、Hash、请求号、`evId` | 存证号、回执、状态、证书状态/受控 `certUrl` | 至信链真实 Provider 已实现；无回执不得标记成功；证书异步轮询 |
 
-当前已配置的文本检测服务为腾讯云 TMS：地域 `ap-guangzhou`、策略 `ip_center`、接口 `TextModeration`。每次业务提交由后端生成不含个人信息的 `DataId`；文本只在调用时传给腾讯云，业务库仅保存文本 Hash、腾讯 `RequestId`、结论和风险标签。至信链真实 Provider 已实现并完成一次真实租户的存证/查询/证书申请/查询联调；未配置真实 Provider 时仍不得生成模拟成功回执。证书展示的星衍树受权查询接口尚未实现。
+当前已配置的文本检测服务为腾讯云 TMS：地域 `ap-guangzhou`、策略 `ip_center`、接口 `TextModeration`。每次业务提交由后端生成不含个人信息的 `DataId`；文本只在调用时传给腾讯云，业务库仅保存文本 Hash、腾讯 `RequestId`、结论和风险标签。至信链真实 Provider 已实现并完成真实租户的存证/查询/证书申请/查询联调；未配置真实 Provider 时仍不得生成模拟成功回执。证书展示使用创作者端受权查询接口，不向浏览器暴露厂商认证材料。
 
 ## 14. API 错误码与权限矩阵
 

@@ -643,9 +643,9 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | POST | `/admin/evidence-records/{evidenceId}/retry` | 平台管理员 | `reason`、`idempotencyKey` | **规划中，尚未注册路由**；不得手工伪造成功 |
 | POST | `/integrations/evidence/callbacks` | 链服务 | 签名、请求号、回执号、链上交易/存证哈希、结果、时间 | 现有通用回调入口；至信链采用主动查询，不依赖此回调 |
 
-### 12.2 至信链证书（前端交接边界）
+### 12.2 至信链证书（创作者端交接边界）
 
-至信链的 `/api/v1/ev/save`、`/api/v1/ev/query`、`/api/v1/ev/cert` 均由后端内部调用，前端不得直连。后端会保存证书状态和 `certUrl`；未来新增受权查询接口后，前端只接收 `certificateStatus`、`certificateUrl`、`updatedAt`，且仅在 `certificateStatus=READY` 时展示“查看链上证书”。当前该平台查询接口尚未注册，不能以厂商地址替代。
+至信链的 `/api/v1/ev/save`、`/api/v1/ev/query`、`/api/v1/ev/cert` 均由后端内部调用，前端不得直连。创作者详情页使用 `GET /api/v1/creator/evidences/{evidenceId}/certificate` 查询本人授权合同或二创作品的证书；只有 `certificate.status=READY` 时 `certificate.certUrl` 非空并展示“查看链上证书”。无权或不存在均返回 `404`，不能以厂商地址替代。
 
 ### 12.3 敏感内容检测与审计
 

@@ -778,6 +778,14 @@ paths:
       parameters: [ { name: authorizationId, in: path, required: true, schema: { type: string } } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialDownloadRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /creator/evidences/{evidenceId}/certificate:
+    get:
+      tags: [可信存证]
+      summary: 查询本人业务存证的链上证书
+      description: 仅创作者本人可查询其授权合同或二创作品的存证。无权访问与不存在均返回 404；仅 certificate.status=READY 时 certificate.certUrl 非空。
+      x-roles: [创作者]
+      parameters: [ { name: evidenceId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' } }
   /creator/works:
     get:
       tags: [作品与内容]
@@ -1215,24 +1223,66 @@ paths:
       tags: [履约与售后]
       summary: 申请商品售后
       x-roles: [消费者]
-      description: 仅取消退款或退货退款；同一订单项不可并行冲突售后。
+      description: 商品可按订单明细申请部分数量。待发货仅可取消退款；已发货、已签收或已完成可按规则申请退货退款；同一订单项不可并行冲突售后。
+      x-idempotency: required
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductAfterSaleRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+      x-success-response-fields: [afterSaleId, status, applyAmount, applyQuantity]
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
   /consumer/after-sales/activity:
     post:
       tags: [履约与售后]
       summary: 申请活动取消退款
       x-roles: [消费者]
-      x-state-precondition: 已核销或已过期预约不得退款
+      description: 仅支持取消退款。预约必须为待核销，且所属场次尚未开始；已核销、已过期、退款中均不得申请。
+      x-idempotency: required
       parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityAfterSaleRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+      x-success-response-fields: [afterSaleId, status, applyAmount]
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/ValidationError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/after-sales:
+    get:
+      tags: [履约与售后]
+      summary: 获取本人售后列表
+      x-roles: [消费者]
+      parameters: [ { name: status, in: query, required: false, schema: { type: string } } ]
+      x-success-response-fields: [items, total]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /consumer/after-sales/{afterSaleId}:
+    get:
+      tags: [履约与售后]
+      summary: 获取本人售后详情
+      x-roles: [消费者]
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } } ]
+      x-success-response-fields: [afterSaleId, bizType, status, ruleSnapshot, applyAmount, applyQuantity, evidences, returnLogistics, returnAddress]
+      description: 固定退货地址仅在客服同意退货后（`RETURNING`）及消费者已寄回待确认阶段返回；待审核阶段不返回该字段。
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /consumer/after-sales/{afterSaleId}/withdraw:
+    post:
+      tags: [履约与售后]
+      summary: 撤回本人待审核售后申请
+      x-roles: [消费者]
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      x-idempotency: required
+      x-success-response-fields: [afterSaleId, status]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /consumer/after-sales/{afterSaleId}/return-logistics:
+    post:
+      tags: [履约与售后]
+      summary: 提交退货物流
+      x-roles: [消费者]
+      description: 仅状态为 `RETURNING` 的商品退货退款单可提交；提交后进入 `PENDING_RECEIPT_CONFIRMATION`。
+      x-idempotency: required
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReturnLogisticsRequest' } } } }
+      x-success-response-fields: [afterSaleId, status, trackingNo]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
   /fulfillment/after-sales/{afterSaleId}/review:
     post:
       tags: [履约与售后]
       summary: 履约客服审核售后
       x-roles: [履约客服]
+      x-permission: FULFILLMENT_AFTER_SALE_MANAGE
       parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AfterSaleReviewRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
@@ -1974,12 +2024,16 @@ components:
       properties: { carrierCode: { type: string, maxLength: 64 }, trackingNo: { type: string, maxLength: 128 }, shippedAt: { type: string, format: date-time, description: 可选 RFC3339 发货时间 }, proofFileId: { type: string, description: 可选发货凭证文件 ID }, remark: { type: string, maxLength: 500 } }
     ProductAfterSaleRequest:
       type: object
-      required: [orderId, orderItemId, afterSaleType, reasonCode]
-      properties: { orderId: { type: string }, orderItemId: { type: string }, afterSaleType: { type: string, enum: [CANCEL_REFUND, RETURN_REFUND] }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 1000 }, evidenceFileIds: { $ref: '#/components/schemas/FileIdList' } }
+      required: [productOrderId, productOrderItemId, afterSaleType, applyQuantity, reasonCode]
+      properties: { productOrderId: { type: string }, productOrderItemId: { type: string }, afterSaleType: { type: string, enum: [CANCEL_REFUND, RETURN_REFUND] }, applyQuantity: { type: integer, minimum: 1, maximum: 99 }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 2000 }, evidenceFileIds: { type: array, maxItems: 9, items: { type: string } } }
     ActivityAfterSaleRequest:
       type: object
-      required: [bookingId, reasonCode]
-      properties: { bookingId: { type: string }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 1000 }, evidenceFileIds: { $ref: '#/components/schemas/FileIdList' } }
+      required: [activityBookingId, reasonCode]
+      properties: { activityBookingId: { type: string }, reasonCode: { type: string }, reasonText: { type: string, maxLength: 2000 }, evidenceFileIds: { type: array, maxItems: 9, items: { type: string } } }
+    ReturnLogisticsRequest:
+      type: object
+      required: [carrierCode, trackingNo]
+      properties: { carrierCode: { type: string, maxLength: 64 }, trackingNo: { type: string, maxLength: 128 }, shippedAt: { type: string, format: date-time, description: 可选 RFC3339 寄件时间 } }
     AfterSaleReviewRequest:
       type: object
       required: [result, comment]
