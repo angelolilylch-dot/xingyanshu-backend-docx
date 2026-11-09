@@ -1801,7 +1801,7 @@ components:
         creationProcessVideos:
           type: array
           maxItems: 3
-          description: 私有创作过程审核证据；仅MP4，单段及全部视频合计均不超过100MB。不进入授权素材包、商城或消费者端。
+          description: 私有创作过程审核证据；仅MP4，单段及全部视频合计均不超过300MB。不进入授权素材包、商城或消费者端。
           items:
             type: object
             required: [fileId, description]

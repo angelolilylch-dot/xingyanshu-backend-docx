@@ -281,7 +281,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/tags` | 后台已登录 | `tagType`、`keyword` | 已启用标签 ID、名称、类型、状态 |
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
-| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | 密钥不经接口读写，仅私有配置文件管理 |
+| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | `PLATFORM_RETURN_ADDRESS` 使用 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填；保存后新建售后单立即取该值并写入快照。密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | 商品/活动规则 JSON、退货费用承担方、启停原因 | 原模板不可编辑；新版本自动停用旧版本 |
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
@@ -351,7 +351,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
 | GET | `/ips` | 城市运营、版权/合规、管理员、集团只读 | `keyword`、`pageNo`、`pageSize` | 权限范围内 IP 列表；城市运营始终限制本人组织。返回素材包状态、素材包存证状态与冻结时间摘要，不返回完整 Hash |
-| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 100MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
+| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 300MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
 | GET | `/ips/{ipId}` | 有权限角色 | 无 | IP 全量详情；按角色脱敏。返回 `creationProcessVideos`（文件 ID、Hash、说明、拍摄日期、锁定时间）或豁免原因；不返回私有存储键或下载链接。确权完成后另返回 `rightsEvidence`、`materialPack`、`materialItems` 和 `dciAssistance` 的锁定申报包 Hash。 |
 | PATCH | `/ips/{ipId}` | 城市运营 | 允许编辑字段、`version` | 仅 `DRAFT`/`SUPPLEMENT_REQUIRED` 且本城市 |
 | POST | `/ips/{ipId}/dci-certificate` | 城市运营 | `certificateNo`、`certificateFileId`、`If-Match-Version`、`Idempotency-Key` | DCI 代办取得证书后的独立回填；只新增证书关联，不修改已经锁定的 IP 内容或素材包 |
@@ -592,12 +592,12 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 | 方法 | 路径 | 角色 | 请求字段 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
-| POST | `/consumer/after-sales/product` | 消费者 | `orderId`、`orderItemId`、`afterSaleType`、`reasonCode`、`reasonText`、`evidenceFileIds`、`idempotencyKey` | 售后单、状态、退货地址摘要 | 商品仅取消退款/退货退款 |
-| POST | `/consumer/after-sales/activity` | 消费者 | `bookingId`、`reasonCode`、`reasonText`、`evidenceFileIds`、`idempotencyKey` | 售后单、状态 | 已核销/已过期拒绝 |
-| GET | `/consumer/after-sales` | 消费者 | `status`、`bizType`、分页 | 本人售后列表 |
-| GET | `/consumer/after-sales/{afterSaleId}` | 消费者本人、处理角色 | 无 | 规则快照、处理轨迹、退货地址、退款/冲销状态 |
-| POST | `/consumer/after-sales/{afterSaleId}/withdraw` | 消费者本人 | `reason`、`version` | 已撤销 | 仅客服未处理时 |
-| POST | `/consumer/after-sales/{afterSaleId}/return-logistics` | 消费者本人 | `carrierCode`、`trackingNo`、`shippedAt`、`version` | 待确认售后 | 仅退货中 |
+| POST | `/consumer/after-sales/product` | 消费者 | `productOrderId`、`productOrderItemId`、`afterSaleType`、`applyQuantity`、`reasonCode`、`reasonText`、`evidenceFileIds`；`Idempotency-Key` | `afterSaleId/status/applyAmount/applyQuantity` | 待发货仅取消退款；已发货/签收/完成可退货退款；同一订单项不可并行；金额为申请商品金额，不含后续财务核定 |
+| POST | `/consumer/after-sales/activity` | 消费者 | `activityBookingId`、`reasonCode`、`reasonText`、`evidenceFileIds`；`Idempotency-Key` | `afterSaleId/status/applyAmount` | 仅待核销且所属场次开始前；仅取消退款 |
+| GET | `/consumer/after-sales` | 消费者 | `status`（可选） | `items/total` | 仅返回本人售后单 |
+| GET | `/consumer/after-sales/{afterSaleId}` | 消费者本人 | 无 | 规则快照、凭证、物流、退款状态 | 固定退货地址仅在 `RETURNING` 或 `PENDING_RECEIPT_CONFIRMATION` 回显 |
+| POST | `/consumer/after-sales/{afterSaleId}/withdraw` | 消费者本人 | `Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=WITHDRAWN` | 仅 `PENDING_REVIEW`；恢复申请前订单/预约状态 |
+| POST | `/consumer/after-sales/{afterSaleId}/return-logistics` | 消费者本人 | `carrierCode`、`trackingNo`、`shippedAt`；`Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=PENDING_RECEIPT_CONFIRMATION` | 仅 `RETURNING` 商品售后单；同一运单不可重复使用 |
 | GET | `/fulfillment/after-sales` | 履约客服 | `status`、`bizType`、日期范围、分页 | 待审核/退货中/待确认队列 |
 | POST | `/fulfillment/after-sales/{afterSaleId}/review` | 履约客服 | `result`、`comment`、`returnFeeBearer`、`suggestedRefundAmount`、`version` | 最新售后状态 | 商品：同意仅退款/退货退款/驳回；活动：同意退款/驳回 |
 | POST | `/fulfillment/after-sales/{afterSaleId}/return-receipt-confirmation` | 履约客服 | `receiptResult`、`conditionResult`、`evidenceFileIds`、`comment`、`version` | 进入退款处理中 | 仅待确认 |
@@ -722,7 +722,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 原始创作 IP 未上传创作过程视频 | 定位到创作过程视频区，上传至少 1 段私有 MP4 |
 | `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 非原始创作 IP 未上传视频且未填写原因 | 显示“无法提供原因”输入框并要求填写 |
 | `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 视频不是 MP4 | 重新选择 MP4 文件 |
-| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 100MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
+| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 300MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
 | `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 已提交审核或已申请 DCI 代办后尝试替换视频 | 展示已锁定状态；按退回补充或新建入库记录处理 |
 | `IP_DCI_CERTIFICATE_NOT_VERIFIED` | 422 | 尝试确权或上架时 DCI 证书未通过版权/合规核验 | 展示核验状态和补充要求，不允许继续流转 |
 | `IP_RIGHTS_NOT_CONFIRMED` | 422 | IP 未完成确权或材料/存证条件不满足 | 不允许上架、购买或绑定后续业务 |

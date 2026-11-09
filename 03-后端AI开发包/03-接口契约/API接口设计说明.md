@@ -349,7 +349,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
 | GET | `/ips` | 城市运营、版权/合规、管理员、集团只读 | `keyword`、`pageNo`、`pageSize` | 权限范围内 IP 列表；城市运营始终限制本人组织。返回素材包状态、素材包存证状态与冻结时间摘要，不返回完整 Hash |
-| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 100MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
+| POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 300MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
 | GET | `/ips/{ipId}` | 有权限角色 | 无 | IP 全量详情；按角色脱敏。返回 `creationProcessVideos`（文件 ID、Hash、说明、拍摄日期、锁定时间）或豁免原因；不返回私有存储键或下载链接。确权完成后另返回 `rightsEvidence`、`materialPack`、`materialItems` 和 `dciAssistance` 的锁定申报包 Hash。 |
 | PATCH | `/ips/{ipId}` | 城市运营 | 允许编辑字段、`version` | 仅 `DRAFT`/`SUPPLEMENT_REQUIRED` 且本城市 |
 | POST | `/ips/{ipId}/dci-certificate` | 城市运营 | `certificateNo`、`certificateFileId`、`If-Match-Version`、`Idempotency-Key` | DCI 代办取得证书后的独立回填；只新增证书关联，不修改已经锁定的 IP 内容或素材包 |
@@ -727,7 +727,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 原始创作 IP 未上传创作过程视频 | 定位到创作过程视频区，上传至少 1 段私有 MP4 |
 | `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 非原始创作 IP 未上传视频且未填写原因 | 显示“无法提供原因”输入框并要求填写 |
 | `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 视频不是 MP4 | 重新选择 MP4 文件 |
-| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 100MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
+| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 300MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
 | `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 已提交审核或已申请 DCI 代办后尝试替换视频 | 展示已锁定状态；按退回补充或新建入库记录处理 |
 | `IP_DCI_CERTIFICATE_NOT_VERIFIED` | 422 | 尝试确权或上架时 DCI 证书未通过版权/合规核验 | 展示核验状态和补充要求，不允许继续流转 |
 | `IP_RIGHTS_NOT_CONFIRMED` | 422 | IP 未完成确权或材料/存证条件不满足 | 不允许上架、购买或绑定后续业务 |
