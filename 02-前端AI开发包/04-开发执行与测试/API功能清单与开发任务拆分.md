@@ -79,8 +79,8 @@
 | API-H5-03 | 活动预约、免费票与核销码展示 | P0 | 6 | API-FND-01、API-CNT-03 | 待开发 |
 | API-FUL-01 | 发货、物流、签收与自动确认 | P0 | 4 | API-H5-02、API-FND-05 | **已完成：** 平台履约发货、物流轮询落库、签收、消费者查询/确认收货、签收 7 天自动确认；回调入口与创作者自行发货后续实现 |
 | API-FUL-02 | 现场核销与活动订单完成 | P0 | 3 | API-H5-03 | 待开发 |
-| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 待开发 |
-| API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 待开发 |
+| API-AFS-01 | 消费者售后申请、撤回与退货物流 | P0 | 6 | API-H5-02、API-H5-03、API-FND-04 | 已完成；由 API-AFS-02 承接审核与退款 |
+| API-AFS-02 | 履约售后审核、财务退款与冲销 | P0 | 5 | API-AFS-01、API-AUT-03 | 本地已实现 Mock 退款闭环；真实退款/冲销待后续 |
 | API-FIN-01 | 收款账户、自动分账、冻结与解冻 | P0 | 7 | API-FUL-01、API-FUL-02、API-AFS-02 | 待开发 |
 | API-FIN-02 | 结算异议、结算批次与线下付款 | P0 | 7 | API-FIN-01、API-FND-04 | 待开发 |
 | API-OPS-01 | 存证、检测、审计与导出 | P0 | 7 | API-FND-02、API-FND-04、API-FND-05 | 待开发 |
@@ -323,12 +323,12 @@
 
 ### API-AFS-02 履约售后审核、财务退款与分账冲销
 
-- **接口范围：** `GET /fulfillment/after-sales`、`POST /fulfillment/after-sales/{afterSaleId}/review`、`POST /fulfillment/after-sales/{afterSaleId}/return-receipt-confirmation`、`GET /finance/refunds`、`POST /finance/refunds/{refundId}/review`、内部 `PaymentProvider.refund`（测试 Mock、生产微信支付 V3 退款 API）。
-- **主写表：** `after_sale_ticket`、`refund_order`、`finance_reversal_record`、`finance_share_record`、`finance_share_item`。
-- **关联校验表：** `return_logistics`、`after_sale_rule_template`、`payment_transaction`、`product_order`、`activity_booking`、`finance_share_record`。
-- **异步/联动表：** `payment_transaction`、库存/名额恢复任务、`evidence_record`、`biz_status_history`、`sys_audit_log`。
-- **核心实现：** 履约客服审核并确认退货收件；财务复核最终金额并发起微信支付退款；退款成功更新售后、订单/预约，生成同比例分账冲销。退款失败不得完成售后。
-- **验收：** 客服不可绕过财务直接退款；部分退款只冲销对应订单项/票种；退款幂等；已核销活动预约不能进入退款流程。
+- **实现状态：** 后台审核、退货验收、财务权限隔离的退款单和 Mock 退款已在本地实现并经 MySQL 集成回归；真实微信退款、失败重试和分账冲销仍未实现。
+- **接口范围：** `GET /admin/after-sales`、`GET /admin/after-sales/{afterSaleId}`、`POST /admin/after-sales/{afterSaleId}/review`、`POST /admin/after-sales/{afterSaleId}/receipt-confirmation`、`POST /admin/after-sales/{afterSaleId}/refunds`。
+- **权限边界：** 审核和验收需 `FULFILLMENT_AFTER_SALE_MANAGE`；退款仅 `FINANCE_REFUND_MANAGE` 可执行，客服无退款权限。
+- **主写表：** `after_sale_ticket`、`refund_order`、`return_logistics`；当前没有分账冲销记录写入。
+- **核心实现：** 商品退货退款同意后进入 `RETURNING`，验收后进入 `PENDING_REFUND`；商品仅退款和活动取消退款同意后直接进入 `PENDING_REFUND`。Mock 退款成功后将售后置为 `REFUNDED`，并在同一事务恢复 SKU 已售库存或活动票种已用名额。
+- **边界与验收：** 写接口要求 `Idempotency-Key`，审核/验收另要求 `If-Match-Version`；退款成功前不得恢复库存/名额；不提供真实微信退款、退款失败重试、退款单列表或分账比例冲销。
 
 ### API-FIN-01 收款账户、自动分账、冻结与解冻
 

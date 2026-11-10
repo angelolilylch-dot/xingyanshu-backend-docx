@@ -597,14 +597,13 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/consumer/after-sales/{afterSaleId}` | 消费者本人 | 无 | 规则快照、凭证、物流、退款状态 | 固定退货地址仅在 `RETURNING` 或 `PENDING_RECEIPT_CONFIRMATION` 回显 |
 | POST | `/consumer/after-sales/{afterSaleId}/withdraw` | 消费者本人 | `Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=WITHDRAWN` | 仅 `PENDING_REVIEW`；恢复申请前订单/预约状态 |
 | POST | `/consumer/after-sales/{afterSaleId}/return-logistics` | 消费者本人 | `carrierCode`、`trackingNo`、`shippedAt`；`Idempotency-Key`、`If-Match-Version` | `afterSaleId/status=PENDING_RECEIPT_CONFIRMATION` | 仅 `RETURNING` 商品售后单；同一运单不可重复使用 |
-| GET | `/fulfillment/after-sales` | 履约客服 | `status`、`bizType`、日期范围、分页 | 待审核/退货中/待确认队列 |
-| POST | `/fulfillment/after-sales/{afterSaleId}/review` | 履约客服 | `result`、`comment`、`returnFeeBearer`、`suggestedRefundAmount`、`version` | 最新售后状态 | 商品：同意仅退款/退货退款/驳回；活动：同意退款/驳回 |
-| POST | `/fulfillment/after-sales/{afterSaleId}/return-receipt-confirmation` | 履约客服 | `receiptResult`、`conditionResult`、`evidenceFileIds`、`comment`、`version` | 进入退款处理中 | 仅待确认 |
-| GET | `/finance/refunds` | 财务 | `status`、`bizType`、日期范围、分页 | 待复核退款列表 |
-| POST | `/finance/refunds/{refundId}/review` | 财务 | `result`（`APPROVE`/`REJECT`）、`refundAmount`、`comment`、`idempotencyKey` | 退款单、售后/订单最新状态 | 通过后调用微信支付退款并生成冲销 |
-| 内部调用 | `PaymentProvider.refund` | 仅财务服务调用 | `refundId`、`idempotencyKey` | 退款流水 | 测试环境 Mock；生产环境调用微信支付 V3 退款 API，不对前端暴露 |
+| GET | `/admin/after-sales` | 履约客服权限 | `status`、`bizType` | 售后队列 | 需 `FULFILLMENT_AFTER_SALE_MANAGE`；当前不分页 |
+| GET | `/admin/after-sales/{afterSaleId}` | 履约客服权限 | 路径 ID | 售后、凭证、退货地址 | 仅已进入退货流程时返回固定退货地址 |
+| POST | `/admin/after-sales/{afterSaleId}/review` | 履约客服 | `approved`、`approvedAmount`、`comment`；`Idempotency-Key`、`If-Match-Version` | `RETURNING` / `PENDING_REFUND` / `REJECTED` | 商品退货退款同意后进入 `RETURNING`；商品仅退款及活动退款进入 `PENDING_REFUND` |
+| POST | `/admin/after-sales/{afterSaleId}/receipt-confirmation` | 履约客服 | `received`、`comment`；`Idempotency-Key`、`If-Match-Version` | `PENDING_REFUND` / `REJECTED` | 仅 `PENDING_RECEIPT_CONFIRMATION` 的退货退款可验收 |
+| POST | `/admin/after-sales/{afterSaleId}/refunds` | 财务 | `comment`、`Idempotency-Key` | 退款单和最新售后状态 | 需 `FINANCE_REFUND_MANAGE`；当前执行 Mock 退款，成功后恢复 SKU 库存或活动票种名额 |
 
-平台管理员只处理特殊异常/争议，不代替履约客服审核或财务金额复核：`POST /admin/after-sales/{afterSaleId}/exceptions`，请求字段为 `decision`、`comment`、`evidenceFileIds`，结果必须记录审计与状态历史。
+本期退款状态机为：`PENDING_REVIEW → RETURNING / PENDING_REFUND / REJECTED`，退货物流提交后为 `PENDING_RECEIPT_CONFIRMATION`，客服确认收货后进入 `PENDING_REFUND`，财务退款成功为 `REFUNDED`。每个审核、验收和退款动作均要求幂等键并写入状态历史与审计日志。真实微信支付 V3 退款、退款失败异步重试、分账比例冲销仍由支付 V3 与 API-FIN-01 后续接入；本期不得将 Mock 退款作为生产退款能力对外宣称。
 
 ## 11. 分账、结算与收款账户接口
 
@@ -756,6 +755,9 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `AFTER_SALE_ALREADY_PROCESSING` | 422 | 同一订单项/预约已有进行中售后 | 跳转已有售后单 |
 | `AFTER_SALE_RETURN_ADDRESS_LOCKED` | 422 | 已创建售后尝试变更退货地址 | 仅显示创建时锁定地址 |
 | `REFUND_AMOUNT_EXCEEDED` | 422 | 退款金额超过可退金额或模板计算结果 | 刷新可退金额 |
+| `AFTER_SALE_REVIEW_NOT_ALLOWED` | 422 | 当前售后单不处于待审核状态 | 刷新售后详情 |
+| `RETURN_RECEIPT_NOT_ALLOWED` | 422 | 当前售后单不处于待确认收货状态 | 刷新售后详情 |
+| `REFUND_NOT_ALLOWED` | 422 | 当前售后单不处于待退款状态 | 刷新售后详情 |
 | `REFUND_TRANSACTION_FAILED` | 422 | 支付退款适配器返回失败 | 售后保持处理中/失败，等待财务处理 |
 | `FINANCE_SHARE_FROZEN` | 422 | 分账处于售后、退款、风险或异议冻结中 | 禁止入结算批次 |
 | `FINANCE_SETTLEMENT_NOT_PAYABLE` | 422 | 非待结算、未核验账户或已冲销明细尝试付款 | 返回不可付款原因 |

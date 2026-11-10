@@ -1259,23 +1259,55 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReturnLogisticsRequest' } } } }
       x-success-response-fields: [afterSaleId, status, trackingNo]
       responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
-  /fulfillment/after-sales/{afterSaleId}/review:
+  /admin/after-sales:
+    get:
+      tags: [履约与售后]
+      summary: 查询后台售后队列
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_AFTER_SALE_MANAGE
+      parameters: [ { name: status, in: query, schema: { type: string } }, { name: bizType, in: query, schema: { type: string, enum: [PRODUCT, ACTIVITY] } } ]
+      x-success-response-fields: [items, total]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/after-sales/{afterSaleId}:
+    get:
+      tags: [履约与售后]
+      summary: 查询后台售后详情
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_AFTER_SALE_MANAGE
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/after-sales/{afterSaleId}/review:
     post:
       tags: [履约与售后]
       summary: 履约客服审核售后
       x-roles: [履约客服]
       x-permission: FULFILLMENT_AFTER_SALE_MANAGE
-      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      x-idempotency: required
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AfterSaleReviewRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
-  /finance/refunds/{refundId}/review:
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /admin/after-sales/{afterSaleId}/receipt-confirmation:
     post:
-      tags: [财务结算]
-      summary: 财务复核退款并触发模拟退款/分账冲销
+      tags: [履约与售后]
+      summary: 履约客服确认退货收件
+      x-roles: [履约客服]
+      x-permission: FULFILLMENT_AFTER_SALE_MANAGE
+      x-idempotency: required
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReceiptConfirmationRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
+  /admin/after-sales/{afterSaleId}/refunds:
+    post:
+      tags: [履约与售后]
+      summary: 财务执行 Mock 退款
       x-roles: [财务]
-      parameters: [ { name: refundId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RefundReviewRequest' } } } }
-      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+      x-permission: FINANCE_REFUND_MANAGE
+      x-idempotency: required
+      parameters: [ { name: afterSaleId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RefundRequest' } } } }
+      x-success-response-fields: [afterSaleId, status, refundId, refundNo, refundAmount, refundMethod]
+      description: 当前仅执行 Mock 退款。真实微信支付退款、失败重试和分账冲销尚未实现。
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/StateConflict' } }
   /files:
     post:
       tags: [文件、存证与运维]
@@ -2018,9 +2050,12 @@ components:
       properties: { carrierCode: { type: string, maxLength: 64 }, trackingNo: { type: string, maxLength: 128 }, shippedAt: { type: string, format: date-time, description: 可选 RFC3339 寄件时间 } }
     AfterSaleReviewRequest:
       type: object
-      required: [result, comment]
-      properties: { result: { type: string }, comment: { type: string }, returnFeeBearer: { type: string }, suggestedRefundAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' } }
-    RefundReviewRequest:
+      required: [approved]
+      properties: { approved: { type: boolean }, approvedAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }, comment: { type: string, maxLength: 2000 } }
+    ReceiptConfirmationRequest:
       type: object
-      required: [result, refundAmount, comment]
-      properties: { result: { type: string, enum: [APPROVE, REJECT] }, refundAmount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }, comment: { type: string } }
+      required: [received]
+      properties: { received: { type: boolean }, comment: { type: string, maxLength: 2000 } }
+    RefundRequest:
+      type: object
+      properties: { comment: { type: string, maxLength: 2000 } }
