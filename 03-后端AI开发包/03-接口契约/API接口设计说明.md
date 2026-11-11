@@ -279,7 +279,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
 | GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | A05 的“客服信息”页签维护 `PLATFORM_SERVICE_PHONE`、`PLATFORM_SERVICE_HOURS`、`PLATFORM_SERVICE_DESCRIPTION`；`PLATFORM_RETURN_ADDRESS` 为 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填，保存后新建售后单立即取值并写快照。密钥不经接口读写，仅私有配置文件管理 |
-| GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | 商品/活动规则 JSON、退货费用承担方、启停原因 | 原模板不可编辑；新版本自动停用旧版本 |
+| GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | `afterSaleTypes` 结构化选项、商品退货费用承担方、启停原因 | 禁止提交任意规则 JSON；商品仅可选取消退款/退货退款，选择退货退款时必须指定运费承担方；活动仅可选取消退款；原模板不可编辑，新版本自动停用旧版本 |
 | GET | `/creator/after-sale-templates` | 创作者 | 必填 `bizType=PRODUCT|ACTIVITY`；兼容 `pageNo/pageSize` | 仅返回启用且有效的模板，供商品/活动表单下拉；不允许维护模板 |
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
