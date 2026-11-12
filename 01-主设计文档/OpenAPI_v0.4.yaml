@@ -1831,6 +1831,8 @@ components:
         ipName: { type: string, maxLength: 100 }
         ipType: { type: string }
         sourceType: { type: string }
+        creationPlace: { type: string, maxLength: 500, description: 可选创作地点；作为 IP 入库资料、确权快照及 DCI 代办资料的一部分。 }
+        publicationPlace: { type: string, maxLength: 500, description: 可选发表地点；作为 IP 入库资料、确权快照及 DCI 代办资料的一部分。 }
         mainCityOrgId: { type: string, description: 主归属城市组织 ID；前端通过 GET /admin/orgs/options 获取，仅可选择 status=ACTIVE 且 orgType=CITY 的组织。 }
         shortIntro: { type: string, maxLength: 500, description: 一句话简介 }
         detailContent: { type: string, maxLength: 20000, description: 完整介绍 }

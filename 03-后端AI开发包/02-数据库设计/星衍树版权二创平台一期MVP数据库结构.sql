@@ -319,6 +319,8 @@ CREATE TABLE IF NOT EXISTS `ip_asset` (
   `ip_name` VARCHAR(200) NOT NULL COMMENT 'IP名称',
   `ip_type` VARCHAR(40) NOT NULL COMMENT 'IP类型；字典：IP类型',
   `source_type` VARCHAR(40) NOT NULL COMMENT '资源来源；字典：资源来源',
+  `creation_place` VARCHAR(500) NULL DEFAULT NULL COMMENT '创作地点；入库人员填写',
+  `publication_place` VARCHAR(500) NULL DEFAULT NULL COMMENT '发表地点；入库人员填写',
   `main_city_org_id` BIGINT UNSIGNED NOT NULL COMMENT '主归属城市；确权后不可直接修改',
   `cover_file_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '封面图',
   `short_intro` VARCHAR(500) NOT NULL COMMENT '一句话简介；文本检测',
