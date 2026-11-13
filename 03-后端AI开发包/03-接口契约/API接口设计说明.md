@@ -57,9 +57,24 @@ API 前缀：`/api/v1`
 }
 ```
 
-HTTP 状态码仅反映协议层结果：`200` 查询/成功、`201` 创建成功、`202` 已受理异步处理、`400` 参数错误、`401` 未登录、`403` 无权限、`404` 不存在、`409` 并发或状态冲突、`422` 业务校验失败、`429` 频率限制、`500` 服务异常。业务原因必须使用 `code` 返回。
+HTTP 状态码仅反映协议层结果：`200` 查询/成功、`201` 创建成功、`202` 已受理异步处理、`400` 参数错误、`401` 未登录、`403` 无权限、`404` 不存在、`409` 并发或状态冲突、`422` 业务校验失败、`429` 频率限制、`500` 服务异常、`503` 服务或其必要依赖暂不可用。业务原因必须使用 `code` 返回。
 
-### 2.2.1 已实现的幂等、版本与状态基座
+### 2.2.1 `503` 服务不可用响应约定
+
+应用服务主动返回的 `503` 必须使用与其他失败响应完全一致的 JSON 外层结构，必须包含非空的 `code`、`message`、`requestId` 与 `timestamp`；不得只返回 HTTP 状态码。例如认证会话查询依赖的数据库暂不可用时：
+
+```json
+{
+  "code": "AUTH_SERVICE_UNAVAILABLE",
+  "message": "登录服务暂不可用，请稍后重试",
+  "requestId": "req_20261113_xxx",
+  "timestamp": "2026-11-13T16:30:00+08:00"
+}
+```
+
+前端对非 2xx 响应必须读取 HTTP 客户端的响应体（例如 Axios 的 `error.response.data`），展示其中的 `message`，并保留 `code` 与 `requestId` 供重试和排查；不得只读取客户端异常对象的 `error.message`。若浏览器网络面板中 `503` 没有上述 JSON 或没有 `requestId`，该响应视为反向代理/网关在请求到达应用前生成：部署配置不得用自定义错误页覆盖 `/api/` 的应用 JSON 响应（Nginx 不应对 API 启用 `proxy_intercept_errors`）。
+
+### 2.2.2 已实现的幂等、版本与状态基座
 
 1. 后端以 `api_idempotency_record` 保存调用主体、方法、路径、幂等键、请求 SHA-256、首次响应快照、完成时间与过期时间；记录与主业务写入使用同一个 MySQL 事务。
 2. 同一“主体 + 方法 + 路径 + 幂等键”在 24 小时内携带相同请求内容时，服务端不再执行业务逻辑，直接重放首次响应；请求内容不同返回 `409 IDEMPOTENCY_CONFLICT`。
@@ -101,7 +116,7 @@ pageNo=1&pageSize=20&keyword=...&sortBy=createdAt&sortOrder=desc
 ### 2.5 文件接口约定
 
 1. 前端先调用上传接口取得 `fileId`，业务提交接口只传 `fileId` 或文件 ID 数组；前端不得保存或拼接 COS `storageKey`。
-2. 上传请求只提交 multipart 字段 `file`。当前后台上传默认按私有文件保存；图片允许 `jpg/jpeg/png/webp` 且最大 10MB，文档允许 `pdf/doc/docx/xls/xlsx` 且最大 30MB，媒体允许 `mp4/mp3/wav` 且最大 200MB。服务端同时校验文件扩展名与探测到的 MIME 类型。
+2. 上传请求只提交 multipart 字段 `file`。后台上传默认按私有文件保存；允许的扩展名和各类别大小由管理员的 `FILE_UPLOAD_POLICY` 动态配置，默认图片 `jpg/jpeg/png/webp` 为 10MB、文档 `pdf/doc/docx/xls/xlsx` 为 30MB、媒体 `mp4/mp3/wav` 为 300MB。策略保存后下一次上传立即生效，无需重启；服务端仍有 300MB 单文件硬上限，并同时校验扩展名与探测到的 MIME 类型。
 3. 下载接口返回短期签名 URL 与过期时间；当前默认有效期为 10 分钟。素材包下载须在后续授权模块中二次校验授权状态。
 4. 文件权限由对象、角色、数据范围和业务状态共同决定，不能仅通过文件 ID 判断。当前通用接口允许上传者本人或平台管理员读取；IP、合同、作品、售后等对象绑定后的细粒度规则由相应业务模块追加校验。
 
@@ -278,7 +293,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/tags` | 后台已登录 | `tagType`、`keyword` | 已启用标签 ID、名称、类型、状态 |
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
-| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | A05 的“客服信息”页签维护 `PLATFORM_SERVICE_PHONE`、`PLATFORM_SERVICE_HOURS`、`PLATFORM_SERVICE_DESCRIPTION`；`PLATFORM_RETURN_ADDRESS` 为 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填，保存后新建售后单立即取值并写快照。密钥不经接口读写，仅私有配置文件管理 |
+| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | A05 维护客服信息、退货地址和 `FILE_UPLOAD_POLICY`；后者为 JSON：`images/documents/media` 各含 `extensions[]/maxSizeMB`，仅可选择系统支持的安全后缀，单类最大 300MB，保存后下一次上传立即生效。`PLATFORM_RETURN_ADDRESS` 为 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填。密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | `afterSaleTypes` 结构化选项、商品退货费用承担方、启停原因 | 禁止提交任意规则 JSON；商品仅可选取消退款/退货退款，选择退货退款时必须指定运费承担方；活动仅可选取消退款；原模板不可编辑，新版本自动停用旧版本 |
 | GET | `/creator/after-sale-templates` | 创作者 | 必填 `bizType=PRODUCT|ACTIVITY`；兼容 `pageNo/pageSize` | 仅返回启用且有效的模板，供商品/活动表单下拉；不允许维护模板 |
 
