@@ -116,9 +116,10 @@ pageNo=1&pageSize=20&keyword=...&sortBy=createdAt&sortOrder=desc
 ### 2.5 文件接口约定
 
 1. 前端先调用上传接口取得 `fileId`，业务提交接口只传 `fileId` 或文件 ID 数组；前端不得保存或拼接 COS `storageKey`。
-2. 上传请求只提交 multipart 字段 `file`。后台上传默认按私有文件保存；允许的扩展名和各类别大小由管理员的 `FILE_UPLOAD_POLICY` 动态配置，默认图片 `jpg/jpeg/png/webp` 为 10MB、文档 `pdf/doc/docx/xls/xlsx` 为 30MB、媒体 `mp4/mp3/wav` 为 300MB。策略保存后下一次上传立即生效，无需重启；服务端仍有 300MB 单文件硬上限，并同时校验扩展名与探测到的 MIME 类型。
+2. 小文件上传请求只提交 multipart 字段 `file`。后台上传默认按私有文件保存；允许的扩展名和各类别大小由管理员的 `FILE_UPLOAD_POLICY` 动态配置，默认图片 `jpg/jpeg/png/webp` 为 10MB、文档 `pdf/doc/docx/xls/xlsx` 为 30MB、媒体 `mp4/mp3/wav` 为 300MB、压缩资料包仅 `zip` 为 300MB。策略保存后下一次上传立即生效，无需重启；服务端仍有 300MB 单文件硬上限，并同时校验扩展名与探测到的 MIME 类型。通用上传链路仅保存 ZIP、不解压或解析内部文件；不支持 RAR。
 3. 下载接口返回短期签名 URL 与过期时间；当前默认有效期为 10 分钟。素材包下载须在后续授权模块中二次校验授权状态。
 4. 文件权限由对象、角色、数据范围和业务状态共同决定，不能仅通过文件 ID 判断。当前通用接口允许上传者本人或平台管理员读取；IP、合同、作品、售后等对象绑定后的细粒度规则由相应业务模块追加校验。
+5. 大文件使用 COS 分片直传：后端只创建受控会话和每个分片的短期 URL，浏览器不得获得 COS 长期密钥或 `storageKey`。上传完成后后端调用 COS `CompleteMultipartUpload` 合并对象，worker 再校验合并后的真实大小、MIME 和全文件 SHA-256；只有状态为 `SUCCESS` 的文件可被业务接口引用。前端须从每次分片 PUT 响应头读取 `ETag`，并在本地增量计算整个原文件的 SHA-256。
 
 ### 2.6 接口鉴权与会话安全
 
@@ -296,7 +297,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/tags` | 后台已登录 | `tagType`、`keyword` | 已启用标签 ID、名称、类型、状态 |
 | GET/POST/PATCH | `/admin/tags`、`/admin/tags/{tagId}/status` | 平台管理员 | 标签类型、名称、排序、启停原因 | 仅维护地域/文化/品类/商业化四类标签 |
 | GET/POST/PATCH | `/admin/regions`、`/admin/regions/{regionId}/status` | 平台管理员 | 六码地区编码、名称、排序、启停原因 | 公开接口仅返回启用地区 |
-| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | `PLATFORM_RETURN_ADDRESS` 使用 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填；`FILE_UPLOAD_POLICY` 使用 JSON：`images/documents/media` 各含 `extensions[]/maxSizeMB`，仅可选择系统支持的安全后缀，单类最大 300MB；保存后下一次上传立即生效。密钥不经接口读写，仅私有配置文件管理 |
+| GET/PATCH | `/admin/configs`、`/admin/configs/{configKey}` | 平台管理员 | 非敏感配置值、原因、`If-Match-Version` | `PLATFORM_RETURN_ADDRESS` 使用 JSON：`recipientName/mobile/provinceCode/cityCode/districtCode/detailAddress`，六项均必填；`FILE_UPLOAD_POLICY` 使用 JSON：`images/documents/media/archives` 各含 `extensions[]/maxSizeMB`，仅可选择系统支持的安全后缀，单类最大 300MB，其中 `archives` 固定仅支持 `zip`；保存后下一次上传立即生效。密钥不经接口读写，仅私有配置文件管理 |
 | GET/POST/PATCH | `/admin/after-sale-templates`、`/admin/after-sale-templates/{templateId}/versions`、`/admin/after-sale-templates/{templateId}/status` | 平台管理员 | `afterSaleTypes` 结构化选项、商品退货费用承担方、启停原因 | 禁止提交任意规则 JSON；商品仅可选取消退款/退货退款，选择退货退款时必须指定运费承担方；活动仅可选取消退款；原模板不可编辑，新版本自动停用旧版本 |
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
@@ -651,6 +652,11 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段 | 返回数据与规则 |
 | --- | --- | --- | --- | --- |
 | POST | `/files` | 已登录后台账号 | multipart `file` | `id`、`fileNo`、`originalName`、`mimeType`、`fileSize`、`fileHash`、`securityLevel`、`uploadStatus` | 只接受配置白名单格式；先校验大小/MIME，再上传 COS；返回 `201` |
+| POST | `/files/multipart/uploads` | 已登录后台账号 | JSON：`fileName`、`fileSize` | `uploadId`、`fileId`、`partSize`（固定 10MiB）、`totalParts`、`parts[].partNumber/uploadURL`、过期时间 | 创建 24 小时有效会话；前端直接 PUT 每个 URL，上传 URL 默认 1 小时有效，可通过下行接口刷新 |
+| POST | `/files/multipart/uploads/{uploadId}/part-urls` | 会话创建人 | 无 | 同创建接口的 `parts[]` | 用于 URL 过期后的续传；仅 `UPLOADING` 会话可刷新 |
+| POST | `/files/multipart/uploads/{uploadId}/complete` | 会话创建人 | JSON：`parts[].partNumber/etag`、`fileHash` | `uploadStatus=VERIFYING` | 服务端完成 COS 合并后返回 `202`；`fileHash` 为前端增量 SHA-256，不能用分片 ETag 拼接代替 |
+| GET | `/files/multipart/uploads/{uploadId}` | 会话创建人 | 无 | `uploadId`、`fileId`、`uploadStatus`、`expiresAt` | 用于轮询 `VERIFYING` 至 `COMPLETED`；文件元数据接口仅在校验成功后可读 |
+| DELETE | `/files/multipart/uploads/{uploadId}` | 会话创建人 | 无 | `uploadStatus=ABORTED` | 取消未完成会话并调用 COS AbortMultipartUpload 清理分片 |
 | GET | `/files/{fileId}` | 上传者本人或平台管理员 | 无 | 文件元数据、可访问状态 | 不返回 `storageKey`、COS Bucket 或密钥 |
 | POST | `/files/{fileId}/download-url` | 上传者本人或平台管理员 | 无 | 短期 `downloadURL`、`expiresAt` | 默认 10 分钟；每次签发写审计 |
 | GET | `/evidence-records` | 管理员；合规/财务/集团按范围只读 | `objectType`、`objectId`、`status`、分页 | 存证编号、Hash、链平台、状态、回执、失败摘要 |
@@ -724,6 +730,10 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `VALIDATION_REQUIRED` | 400 | 必填字段缺失 | 定位到对应表单字段 |
 | `VALIDATION_FORMAT_INVALID` | 400 | 金额、时间、地区、文件等格式错误 | 显示字段级错误信息 |
 | `VALIDATION_FILE_NOT_ALLOWED` | 422 | 文件类型、大小、密级或用途不符合要求 | 提示重新上传 |
+| `DATABASE_UNAVAILABLE` | 503 | 文件上传创建或确认记录时数据库连接/连接池暂不可用 | 显示“数据库服务暂不可用，请稍后重试”，保留 `requestId`；用户可重新上传 |
+| `MULTIPART_UPLOAD_NOT_SUPPORTED` | 501 | 当前文件存储适配器未启用分片能力 | 降级为普通上传或联系运维切换 COS 存储 |
+| `MULTIPART_UPLOAD_EXPIRED` | 410 | 会话已过期、已取消或不再可刷新/完成 | 保留本地文件，重新创建上传会话 |
+| `FILE_MULTIPART_INIT_FAILED` / `FILE_MULTIPART_URL_FAILED` / `FILE_MULTIPART_COMPLETE_FAILED` | 502 | COS 初始化、签发分片 URL 或完成合并失败 | 保留 `requestId`，刷新或重新开始上传 |
 | `RESOURCE_CONFLICT` | 409 | 唯一账号、手机号等资源已存在 | 修改冲突字段后重新提交 |
 | `VERSION_CONFLICT` | 409 | `If-Match-Version` 与当前版本不一致 | 刷新详情并提示数据已更新 |
 | `IDEMPOTENCY_CONFLICT` | 409 | 同一幂等键被不同请求体复用 | 停止重复提交并联系处理人员 |
