@@ -722,11 +722,18 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `CREATOR_SUSPENDED` | 403 | 创作者账号已停用 | 禁止新增操作，提示平台联系渠道 |
 | `IP_NOT_LISTED` | 422 | IP 未上架、暂停、下架、失效或商城隐藏 | 刷新商城，不允许购买 |
 | `IP_DCI_CERTIFICATE_REQUIRED` | 422 | 提交 IP 审核时未上传 DCI 版权证书编号或文件 | 停留在编辑页，补齐 DCI 证书；已申请代办时等待线下代办完成后补传 |
-| `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 原始创作 IP 未上传创作过程视频 | 定位到创作过程视频区，上传至少 1 段私有 MP4 |
-| `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 非原始创作 IP 未上传视频且未填写原因 | 显示“无法提供原因”输入框并要求填写 |
-| `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 视频不是 MP4 | 重新选择 MP4 文件 |
-| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 300MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
-| `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 已提交审核或已申请 DCI 代办后尝试替换视频 | 展示已锁定状态；按退回补充或新建入库记录处理 |
+| `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 服务端 message：`原始创作的IP必须至少上传一段创作过程视频` | 定位 `creationProcessVideos`，上传至少 1 段私有 MP4；响应含 `maxCount=3`、`maxTotalSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 服务端 message：`未上传创作过程视频时，请填写无法提供原因` | 定位 `creationProcessVideoExemptionReason` |
+| `IP_CREATION_PROCESS_VIDEO_DESCRIPTION_REQUIRED` | 422 | 服务端 message：`请填写创作过程视频说明` | 定位 `creationProcessVideos[].description` |
+| `IP_CREATION_PROCESS_VIDEO_FILE_NOT_FOUND` | 404 | 服务端 message：`创作过程视频不存在` | 定位 `creationProcessVideos[].fileId`；`action=RESELECT_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_UPLOAD_NOT_COMPLETED` | 422 | 服务端 message：`创作过程视频尚未上传完成，请等待上传成功后再保存` | 保留表单；`action=WAIT_UPLOAD` |
+| `IP_CREATION_PROCESS_VIDEO_REVIEW_RETURNED` | 422 | 服务端 message：`创作过程视频内容复核未通过，请替换后再提交IP` | 历史已退回文件的兼容错误；`action=REPLACE_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_FILE_UNAVAILABLE` | 422 | 服务端 message：`创作过程视频当前不可用，请重新选择已审核通过的文件` | 定位视频项；`action=RESELECT_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 服务端 message：`创作过程视频仅支持MP4格式` | 定位 `creationProcessVideos[].fileId`；响应含 `allowedMimeType=video/mp4` |
+| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` | 422 | 服务端 message：`单个创作过程视频不得超过300MB` | 定位对应视频；响应含 `maxSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 服务端 message：`创作过程视频总大小不得超过300MB` | 定位视频列表；响应含 `maxTotalSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_COUNT_EXCEEDED` | 422 | 服务端 message：`创作过程视频最多上传3段` | 定位视频列表；响应含 `maxCount=3` |
+| `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 服务端 message：`创作过程视频已随提交审核或DCI代办锁定，不能替换` | 刷新详情并切换只读 |
 | `IP_DCI_CERTIFICATE_NOT_VERIFIED` | 422 | 尝试确权或上架时 DCI 证书未通过版权/合规核验 | 展示核验状态和补充要求，不允许继续流转 |
 | `IP_RIGHTS_NOT_CONFIRMED` | 422 | IP 未完成确权或材料/存证条件不满足 | 不允许上架、购买或绑定后续业务 |
 | `IP_MAIN_CITY_LOCKED` | 422 | 已确权 IP 尝试修改主归属城市 | 禁止编辑，走异常处置流程 |

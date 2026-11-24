@@ -673,8 +673,6 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | GET | `/content-detections` | 平台管理员、版权/合规按范围 | `objectType`、`objectId`、`status`、日期范围、分页 | 检测结果、风险类别、服务请求号、错误摘要；不返回敏感词原文 |
 | GET | `/compliance/content-detections` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `pageNo`、`pageSize` | 仅 IP 且状态为 `REVIEW` 的人工复核队列；返回 `id`、`version`、IP、风险分类、置信度及厂商可提供的命中字段/片段/字符位置。无定位信息时 `hits=[]`，不得按空数组推定文本无风险。 |
 | POST | `/compliance/content-detections/{detectionId}/review` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `If-Match-Version`；`decision=PASS/RETURN`、`comment`（必填，最多 500 字） | 完成人工复核并返回最新检测状态与版本号；`PASS` 后可继续提交 IP，`RETURN` 表示退回给城市运营修改后重新保存/提交。 |
-| GET | `/compliance/file-content-detections` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `pageNo`、`pageSize` | 文件内容复核队列，含私有短期 `downloadURL`、文件名、MIME、大小与检测记录版本。 |
-| POST | `/compliance/file-content-detections/{detectionId}/review` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `If-Match-Version`；`decision=PASS/RETURN`、`comment` | `PASS` 将文件置为 `ACTIVE` 后可引用；`RETURN` 将文件置为 `RETURNED`，必须替换上传。 |
 | GET | `/audit-logs` | 平台管理员、集团管理层按权限 | `operatorId`、`objectType`、`objectId`、`action`、日期范围、分页 | 操作人、角色、前后状态摘要、结果、时间、IP |
 | POST | `/exports` | 有导出权限角色 | `objectType`、`scope`、`maskLevel`、`reason` | 导出任务编号、状态 | 全部导出留痕 |
 | GET | `/exports/{exportId}` | 导出申请人/管理员 | 无 | 状态、文件下载短链、过期时间 |
@@ -747,11 +745,18 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `CREATOR_SUSPENDED` | 403 | 创作者账号已停用 | 禁止新增操作，提示平台联系渠道 |
 | `IP_NOT_LISTED` | 422 | IP 未上架、暂停、下架、失效或商城隐藏 | 刷新商城，不允许购买 |
 | `IP_DCI_CERTIFICATE_REQUIRED` | 422 | 提交 IP 审核时未上传 DCI 版权证书编号或文件 | 停留在编辑页，补齐 DCI 证书；已申请代办时等待线下代办完成后补传 |
-| `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 原始创作 IP 未上传创作过程视频 | 定位到创作过程视频区，上传至少 1 段私有 MP4 |
-| `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 非原始创作 IP 未上传视频且未填写原因 | 显示“无法提供原因”输入框并要求填写 |
-| `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 视频不是 MP4 | 重新选择 MP4 文件 |
-| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` / `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 单段或全部视频超过 300MB | 提示压缩、剪辑后重新上传；响应返回大小上限 |
-| `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 已提交审核或已申请 DCI 代办后尝试替换视频 | 展示已锁定状态；按退回补充或新建入库记录处理 |
+| `IP_CREATION_PROCESS_VIDEO_REQUIRED` | 422 | 服务端 message：`原始创作的IP必须至少上传一段创作过程视频` | `field=creationProcessVideos`；同时返回 `maxCount=3`、`maxTotalSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_EXEMPTION_REQUIRED` | 422 | 服务端 message：`未上传创作过程视频时，请填写无法提供原因` | `field=creationProcessVideoExemptionReason` |
+| `IP_CREATION_PROCESS_VIDEO_DESCRIPTION_REQUIRED` | 422 | 服务端 message：`请填写创作过程视频说明` | `field=creationProcessVideos[].description` |
+| `IP_CREATION_PROCESS_VIDEO_FILE_NOT_FOUND` | 404 | 服务端 message：`创作过程视频不存在` | `field=creationProcessVideos[].fileId`、`action=RESELECT_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_UPLOAD_NOT_COMPLETED` | 422 | 服务端 message：`创作过程视频尚未上传完成，请等待上传成功后再保存` | `field=creationProcessVideos[].fileId`、`action=WAIT_UPLOAD` |
+| `IP_CREATION_PROCESS_VIDEO_REVIEW_RETURNED` | 422 | 服务端 message：`创作过程视频内容复核未通过，请替换后再提交IP` | 历史已退回文件的兼容错误；`action=REPLACE_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_FILE_UNAVAILABLE` | 422 | 服务端 message：`创作过程视频当前不可用，请重新选择已审核通过的文件` | `field=creationProcessVideos[].fileId`、`action=RESELECT_FILE` |
+| `IP_CREATION_PROCESS_VIDEO_INVALID_TYPE` | 422 | 服务端 message：`创作过程视频仅支持MP4格式` | `field=creationProcessVideos[].fileId`、`allowedMimeType=video/mp4` |
+| `IP_CREATION_PROCESS_VIDEO_TOO_LARGE` | 422 | 服务端 message：`单个创作过程视频不得超过300MB` | `field=creationProcessVideos[].fileId`、`maxSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_TOTAL_SIZE_EXCEEDED` | 422 | 服务端 message：`创作过程视频总大小不得超过300MB` | `field=creationProcessVideos`、`maxTotalSizeBytes=314572800` |
+| `IP_CREATION_PROCESS_VIDEO_COUNT_EXCEEDED` | 422 | 服务端 message：`创作过程视频最多上传3段` | `field=creationProcessVideos`、`maxCount=3` |
+| `IP_CREATION_PROCESS_VIDEO_LOCKED` | 422 | 服务端 message：`创作过程视频已随提交审核或DCI代办锁定，不能替换` | 不提供编辑入口 |
 | `IP_DCI_CERTIFICATE_NOT_VERIFIED` | 422 | 尝试确权或上架时 DCI 证书未通过版权/合规核验 | 展示核验状态和补充要求，不允许继续流转 |
 | `IP_RIGHTS_NOT_CONFIRMED` | 422 | IP 未完成确权或材料/存证条件不满足 | 不允许上架、购买或绑定后续业务 |
 | `IP_MAIN_CITY_LOCKED` | 422 | 已确权 IP 尝试修改主归属城市 | 禁止编辑，走异常处置流程 |
