@@ -137,7 +137,7 @@
 | `POST /avatar/auth/login` | `mobile`、`smsCode` | **已实现**。返回独立 `AVATAR_H5` access/refresh token；尚未匹配名单不等于登录失败。 |
 | `POST /avatar/auth/refresh` | `refreshToken` | **已实现**。刷新并轮换独立会话令牌版本。 |
 | `POST /avatar/auth/logout` | 无 | **已实现**。仅注销当前设备会话。 |
-| `GET /avatar/profiles/me` | 无 | **已实现**。返回本人绑定后的档案、实名、授权与状态摘要；`summary.bodyDataFilled` 以当前会话已加密保存的体型资料为准，`submittedAt` 为当前会话提交时间；替代历史设计中的 `/avatar/me`。 |
+| `GET /avatar/profiles/me` | 无 | **已实现**。返回本人绑定后的档案、实名、授权与状态摘要；`summary.bodyDataFilled` 以当前会话已加密保存的体型资料为准，`submittedAt` 为当前会话提交时间；`identityVerification` 明确返回等待、通过、未通过或异常，以及可展示原因、失败次数和是否可重采；替代历史设计中的 `/avatar/me`。 |
 | `POST /avatar/identity-verifications` | `verificationMethod=MOCK` | **仅测试辅助接口**。不再作为 H5 名单绑定前置条件；生产环境不注册 Mock 完成接口。 |
 | `POST /avatar/test/identity-verifications/{id}/complete` | `name`、`gender`、`idNumberLast4?` | **仅 test 环境**。用于单独验证 Mock 实名接口，不接受完整身份证号。 |
 | `GET /avatar/identity-verifications/latest` | 无 | **已实现**。返回本人最新 Mock 实名记录，不是绑定前置条件。 |
@@ -151,6 +151,7 @@
 | `POST /avatar/collection-sessions/{sessionId}/submit` | `version` | 校验 8 张照片与视频齐全，创建自动质检任务；通过即归档，异常/抽检/风控才创建人工复核。 |
 | `GET /avatar/profiles/me` | 无 | 返回本人档案状态、当前版本、可补采原因、授权摘要，以及当前会话的照片数、视频数、体型资料已填写标记和提交时间。 |
 | `POST /avatar/profiles/me/reshoot` | `reason` | **已实现**。仅 `RESHOOT_REQUIRED` 可补采；创建新的进行中版本，不复用旧素材。 |
+| `POST /avatar/profiles/me/face-identity-reshoots` | `reason?` | **已实现**。仅本人核验 `REJECTED/ERROR` 且档案为 `RESHOOT_REQUIRED` 时可调用；创建新版本并由服务端复用 `FACE_02..FACE_08`、`VOICE_VIDEO`，H5 仅重传 `FACE_01`。累计 3 次未通过返回 `AVATAR_FACE_IDENTITY_RESHOOT_LIMIT_EXCEEDED`，转人工处理。 |
 | `POST /avatar/profiles/me/deletion-requests` | `reason` | 创建删除申请并立即停止新增采集与访问签名。 |
 | `GET /avatar/profiles/me/deletion-requests/latest` | 无 | **已实现**。返回本人最新删除处理进度。 |
 
