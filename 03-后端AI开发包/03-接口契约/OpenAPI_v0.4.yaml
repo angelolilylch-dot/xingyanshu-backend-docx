@@ -479,6 +479,25 @@ paths:
       x-roles: [版权合规]
       parameters: [ { $ref: '#/components/parameters/Keyword' }, { name: dciCertificateStatus, in: query, description: DCI证书状态筛选，仅支持 UPLOADED 或 VERIFIED, schema: { type: string, enum: [UPLOADED, VERIFIED] } }, { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
       responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /compliance/content-detections:
+    get:
+      tags: [IP与方案]
+      summary: 查询 IP 文本内容人工复核队列
+      description: 仅返回检测状态为 REVIEW 的 IP 文本记录。hits 为腾讯云可提供的命中字段、片段及字符位置；厂商未提供定位信息时为空数组，不能据此判断文本无风险。
+      x-roles: [版权合规]
+      x-permissions: [IP_REVIEW_COMPLIANCE]
+      parameters: [ { $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /compliance/content-detections/{detectionId}/review:
+    post:
+      tags: [IP与方案]
+      summary: 人工复核 IP 文本内容检测
+      description: PASS 后允许 IP 继续提交；RETURN 由城市运营修改内容后重新保存或提交。复核意见必填。
+      x-roles: [版权合规]
+      x-permissions: [IP_REVIEW_COMPLIANCE]
+      parameters: [ { name: detectionId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ContentDetectionReviewRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/StateConflict' }, '422': { $ref: '#/components/responses/ValidationError' } }
   /compliance/dci-assistance-requests:
     get:
       tags: [IP与方案]
@@ -1877,6 +1896,10 @@ components:
       type: object
       required: [certificateNo, certificateFileId]
       properties: { certificateNo: { type: string, maxLength: 128 }, certificateFileId: { type: string } }
+    ContentDetectionReviewRequest:
+      type: object
+      required: [decision, comment]
+      properties: { decision: { type: string, enum: [PASS, RETURN] }, comment: { type: string, maxLength: 500 } }
     MaterialPackInput:
       type: object
       required: [packName, items]

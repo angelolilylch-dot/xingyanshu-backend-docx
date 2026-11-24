@@ -65,7 +65,7 @@
 | API-FND-05 | 外部服务适配器与安全回调框架 | P0 | 内部 | API-FND-01、API-FND-04 | 已完成基础框架；至信链真实存证与证书流程由 API-FND-05-R3 承接并已联调 |
 | API-ID-01 | 创作者实名、委托书草稿/留存与账号状态 | P0 | 8 | API-FND-01、API-FND-04、API-FND-05 | 已完成（短信/实名 Mock；企业/工作室 Word 草稿自动生成） |
 | API-IP-01 | IP 录入、编辑、提交与查询 | P0 | 6 | API-SYS-02、API-FND-03、API-FND-04 | 已完成 |
-| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（业务测试曾使用 Mock；运行时可配置至信链真实 Provider） |
+| API-IP-02 | IP 合规审核、DCI 处理、确权与存证 | P0 | 6 | API-IP-01、API-FND-05 | 已完成（含 IP 文本疑似风险人工复核；至信链 Provider 按运行配置） |
 | API-IP-03 | 授权方案与分配方案配置审核 | P0 | 10 | API-FND-03 | 已完成 |
 | API-AUT-01 | 创作者 IP 商城与购买预览 | P0 | 3 | API-IP-02、API-IP-03、API-ID-01 | 已完成 |
 | API-AUT-02 | 授权待支付订单、取消与名额预占 | P0 | 3 | API-AUT-01、API-FND-02 | 已完成 |
@@ -176,11 +176,11 @@
 
 ### API-IP-02 IP 合规审核、DCI 处理、确权与存证
 
-- **接口范围：** `GET /compliance/dci-assistance-requests`、`POST /compliance/dci-assistance-requests/{requestId}/handle`、`POST /compliance/dci-assistance-requests/{requestId}/application-package`、`POST /ips/{ipId}/dci-verifications`、`POST /ips/{ipId}/rights-reviews`；评估报告接口复用 `POST /ips/{ipId}/evaluation-reports`。
+- **接口范围：** `GET /compliance/content-detections`、`POST /compliance/content-detections/{detectionId}/review`、`GET /compliance/dci-assistance-requests`、`POST /compliance/dci-assistance-requests/{requestId}/handle`、`POST /compliance/dci-assistance-requests/{requestId}/application-package`、`POST /ips/{ipId}/dci-verifications`、`POST /ips/{ipId}/rights-reviews`；评估报告接口复用 `POST /ips/{ipId}/evaluation-reports`。
 - **主写表：** `ip_dci_assistance_request`、`ip_review_record`、`ip_auth_binding`、`ip_distribution_item`、`ip_asset`、`evidence_record`。
 - **关联校验表：** `ip_right_document`、`ip_evaluation_report`、`auth_plan_version`、`finance_distribution_plan`、`finance_distribution_plan_item`、`file_relation`、`file_object`。
 - **异步/联动表：** `biz_status_history`、`sys_audit_log`、`content_detection_record`；存证服务失败时不推进 `LISTED`。
-- **核心实现：** 版权/合规读取完整 DCI 联系方式并记录无明文审计，处理代办状态；可生成私有 ZIP 资料包，内含 Markdown 申请资料、作品说明、权属证明和作品附件，评估报告可选附带。先核验 DCI，再确权或退回补充。退回理由必填。确权时可确认或调整最终方案和比例，先生成快照并获得测试 Mock 存证成功回执及链上交易/存证哈希，再写正式 `ip_auth_binding`，并在同一事务中将 IP 自动置为 `LISTED`、设置商城可见；确权响应返回 `evidenceTransactionHash` 供 B03 展示和复制。
+- **核心实现：** IP 文本检测返回 `REVIEW` 时，IP 仍保存为草稿但禁止提交；版权/合规在 B03 的“内容复核”页签按检测记录版本作出 `PASS/RETURN`，复核意见必填，服务商返回时展示命中字段/片段/字符位置。`PASS` 后可继续提交，`RETURN` 后由城市运营修改再保存/提交。版权/合规读取完整 DCI 联系方式并记录无明文审计，处理代办状态；可生成私有 ZIP 资料包，内含 Markdown 申请资料、作品说明、权属证明和作品附件，评估报告可选附带。先核验 DCI，再确权或退回补充。退回理由必填。确权时可确认或调整最终方案和比例，先生成快照并获得测试 Mock 存证成功回执及链上交易/存证哈希，再写正式 `ip_auth_binding`，并在同一事务中将 IP 自动置为 `LISTED`、设置商城可见；确权响应返回 `evidenceTransactionHash` 供 B03 展示和复制。
 - **验收：** 不存在 IP 直接“审核驳回”终态；退回必须有理由；无存证成功回执不得确权或上架；暂停、恢复、下架接口均已独立实现，风险处置按当前范围暂缓。
 
 ### API-IP-03 授权方案与分配方案配置审核

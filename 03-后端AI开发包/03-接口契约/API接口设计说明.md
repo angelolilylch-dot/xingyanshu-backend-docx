@@ -671,6 +671,10 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | 方法 | 路径 | 角色 | 请求字段/筛选 | 返回数据 |
 | --- | --- | --- | --- | --- |
 | GET | `/content-detections` | 平台管理员、版权/合规按范围 | `objectType`、`objectId`、`status`、日期范围、分页 | 检测结果、风险类别、服务请求号、错误摘要；不返回敏感词原文 |
+| GET | `/compliance/content-detections` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `pageNo`、`pageSize` | 仅 IP 且状态为 `REVIEW` 的人工复核队列；返回 `id`、`version`、IP、风险分类、置信度及厂商可提供的命中字段/片段/字符位置。无定位信息时 `hits=[]`，不得按空数组推定文本无风险。 |
+| POST | `/compliance/content-detections/{detectionId}/review` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `If-Match-Version`；`decision=PASS/RETURN`、`comment`（必填，最多 500 字） | 完成人工复核并返回最新检测状态与版本号；`PASS` 后可继续提交 IP，`RETURN` 表示退回给城市运营修改后重新保存/提交。 |
+| GET | `/compliance/file-content-detections` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `pageNo`、`pageSize` | 文件内容复核队列，含私有短期 `downloadURL`、文件名、MIME、大小与检测记录版本。 |
+| POST | `/compliance/file-content-detections/{detectionId}/review` | 版权/合规，`IP_REVIEW_COMPLIANCE` | `If-Match-Version`；`decision=PASS/RETURN`、`comment` | `PASS` 将文件置为 `ACTIVE` 后可引用；`RETURN` 将文件置为 `RETURNED`，必须替换上传。 |
 | GET | `/audit-logs` | 平台管理员、集团管理层按权限 | `operatorId`、`objectType`、`objectId`、`action`、日期范围、分页 | 操作人、角色、前后状态摘要、结果、时间、IP |
 | POST | `/exports` | 有导出权限角色 | `objectType`、`scope`、`maskLevel`、`reason` | 导出任务编号、状态 | 全部导出留痕 |
 | GET | `/exports/{exportId}` | 导出申请人/管理员 | 无 | 状态、文件下载短链、过期时间 |
@@ -758,6 +762,7 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 | `AUTHORIZATION_EXPIRED` | 422 | 授权已到期或已解除 | 停止下载和新内容创建，可按有效新方案重新购买 |
 | `AUTH_ORDER_PAYMENT_EXPIRED` | 422 | 授权订单已超时关闭 | 刷新订单，重新购买 |
 | `CONTENT_TEXT_REJECTED` | 422 | 敏感内容检测不通过 | 返回脱敏修改提示，允许新版本重提 |
+| `CONTENT_DETECTION_REVIEW_REQUIRED` | 422 | IP 文本检测命中疑似风险，等待版权/合规人工复核 | IP 已以草稿保存；城市运营不能提交，等待 B03“内容复核”页签处理 |
 | `CONTENT_TEXT_SUSPECTED` | 422 | 非商品内容检测疑似风险 | 活动禁止发布并返回修改提示；作品进入人工复核。商品同步检测疑似不返回该错误，保留 `PENDING_COPYRIGHT_REVIEW` 进入二级审核 |
 | `CONTENT_TEXT_CHECK_ERROR` | 422 | 敏感内容检测超时或异常 | 禁止流转，允许重新提交 |
 | `CONTENT_WORK_NOT_CONFIRMED` | 422 | 商品关联作品未确权 | 跳转作品处理，禁止创建商品 |
