@@ -1,5 +1,9 @@
 # 前端 AI 变更摘要
 
+## 2026-11-25：B02 IP 入库选项与字典调用收口
+
+IP 入库页面只能请求后端白名单内的字典类型，禁止使用别名路径试探“权利取得方式”“证明类型”等选项。`rightHolder.acquisitionMethod` 使用接口契约固定六项；`rightDocuments[].documentType` 在后端未开放 `RIGHT_DOCUMENT_TYPE` 前使用受控本地选项；`sourceType` 同样不得调用未定义字典。IP 类型、权利人类型、适用商品/活动类型、标签和主归属城市必须分别使用规定的字典、标签、组织接口。`400 VALIDATION_FORMAT_INVALID` 表示字典类型不被允许，前端必须显示服务端原始 `message/requestId`，不得误报“请求方式不正确”。完整清单见 [IP入库选项来源与字典调用规则.md](IP入库选项来源与字典调用规则.md)。
+
 ## 2026-11-24：IP 入库统一审核流程
 
 IP 入库不再为创作过程视频单独设置文件内容复核和阻断。`POST /files` 或分片完成后只代表文件上传成功，可作为 IP 草稿资料引用；文件、视频、文本、权属、DCI 和方案均由版权/合规人员在 IP 审核详情中统一审查。上传未完成仍返回 `IP_CREATION_PROCESS_VIDEO_UPLOAD_NOT_COMPLETED`，不存在的文件返回 `IP_CREATION_PROCESS_VIDEO_FILE_NOT_FOUND`，不得再把已上传文件误提示为“未上传完成”。

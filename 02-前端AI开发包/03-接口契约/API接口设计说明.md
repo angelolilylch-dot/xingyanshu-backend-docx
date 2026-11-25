@@ -284,6 +284,10 @@ X-Signature: HMAC-SHA256(method + path + timestamp + requestId + bodyHash)
 
 固定枚举以 [页面功能与字段清单.md](页面功能与字段清单.md) 第 11.8 节和 `数据库字段字典.xlsx` 的“枚举字典”工作表为准；服务启动时由 `bootstrap` 幂等写入 `sys_dict_item`，仅允许通过字典查询接口只读获取。地区、标签为平台管理员可维护主数据，统一放在 A05 的对应选项卡。前端不得写死中文状态文字。
 
+### 4.3 B02 IP 入库选项来源约束
+
+IP 入库只可查询 `IP_TYPE`、`RIGHT_HOLDER_TYPE`、`APPLICABLE_PRODUCT_TYPE`、`APPLICABLE_ACTIVITY_TYPE` 等后端白名单字典；标签使用 `GET /tags`，主归属城市使用 `GET /admin/orgs/options`。`rightHolder.acquisitionMethod` 是固定枚举（`ORIGINAL_CREATION`、`TRANSFER`、`LICENSE`、`INHERITANCE`、`ENTRUSTED_MANAGEMENT`、`OTHER`），不得请求字典。当前 `rightDocuments[].documentType` 与 `sourceType` 未开放为标准字典，前端必须使用接口契约约定的受控固定选项，禁止调用或探测 `RIGHT_DOCUMENT_TYPE`、`RIGHT_DOC_TYPE`、`DOCUMENT_TYPE`、`SOURCE_TYPE` 等未定义字典路径。完整前端执行规则见 [IP入库选项来源与字典调用规则.md](IP入库选项来源与字典调用规则.md)。
+
 ## 5. 登录、账号与实名认证接口
 
 ### 5.1 管理后台登录
