@@ -373,6 +373,7 @@ IP 入库只可查询 `IP_TYPE`、`RIGHT_HOLDER_TYPE`、`APPLICABLE_PRODUCT_TYPE
 | GET | `/ips` | 城市运营、版权/合规、管理员、集团只读 | `keyword`、`pageNo`、`pageSize` | 权限范围内 IP 列表；城市运营始终限制本人组织。返回素材包状态、素材包存证状态与冻结时间摘要，不返回完整 Hash |
 | POST | `/ips` | 城市运营 | `ipName`、`ipType`、`sourceType`、展示资料、权利人、版权证明、**`creationProcessVideos` 或 `creationProcessVideoExemptionReason`**、**`materialPack`**、DCI 证书或 `dciAssistanceRequested/dciAssistanceRequest`、方案及分配 | 点击“保存 IP”后创建 `DRAFT` IP 和完整素材包。原始创作至少上传一段私有 MP4；其他取得方式无视频时须填写豁免原因。最多 3 段，单段及合计不超过 300MB。勾选代办时同一事务锁定素材清单、视频 Hash 与 DCI 代办申请；代办与 DCI 证书互斥。 |
 | GET | `/ips/{ipId}` | 有权限角色 | 无 | IP 全量详情；按角色脱敏。返回 `creationProcessVideos`（文件 ID、Hash、说明、拍摄日期、锁定时间）或豁免原因；不返回私有存储键或下载链接。确权完成后另返回 `rightsEvidence`、`materialPack`、`materialItems` 和 `dciAssistance` 的锁定申报包 Hash。 |
+| GET | `/ips/{ipId}/review-history` | 城市运营（仅本城市）、版权/合规、授权方案管理员、看板只读 | 无 | 按时间正序返回 IP 的审核结论、状态流转与权属确认存证回执。`items[]` 使用 `recordType=REVIEW/STATUS_CHANGE/EVIDENCE`；审核项包含节点、结论、意见、补充事项和审核人，状态项包含前后状态、原因和操作主体，存证项包含状态、编号、回执号和交易 Hash。不返回内部 `sys_audit_log` 原始快照。 |
 | PATCH | `/ips/{ipId}` | 城市运营 | 允许编辑字段、`version` | 仅 `DRAFT`/`SUPPLEMENT_REQUIRED` 且本城市 |
 | POST | `/ips/{ipId}/dci-certificate` | 城市运营 | `certificateNo`、`certificateFileId`、`If-Match-Version`、`Idempotency-Key` | DCI 代办取得证书后的独立回填；只新增证书关联，不修改已经锁定的 IP 内容或素材包 |
 | POST | `/ips/{ipId}/dci-assistance-requests` | 城市运营 | `contactName`、`contactMobile`、`preferredContactTime`、`requestNote`、`idempotencyKey` | 仅用于已保存 IP 后补申请 DCI 代办；创建联系请求，IP 的 DCI 状态改为 `ASSISTANCE_REQUESTED`；不得提交审核 |

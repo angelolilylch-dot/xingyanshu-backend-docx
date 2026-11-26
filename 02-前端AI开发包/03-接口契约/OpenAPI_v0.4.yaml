@@ -442,6 +442,17 @@ paths:
       parameters: [ { name: ipId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatchVersion' } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/IpCreateRequest' } } } }
       responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/StateConflict' } }
+  /ips/{ipId}/review-history:
+    get:
+      tags: [IP与方案]
+      summary: 查询 IP 审核历史
+      description: 按时间正序返回审核结论、业务状态流转和权属确认存证回执；不返回内部系统审计原始快照。
+      x-roles: [城市运营, 版权合规, 授权方案管理员, 集团管理层]
+      x-data-scope: 城市运营限本城市；其他角色沿用 IP 详情访问范围
+      x-success-response-fields: [ipId, items]
+      x-item-contract: REVIEW 包含 reviewNode/result/comment/supplementItems/reviewerId/reviewerName/occurredAt；STATUS_CHANGE 包含 fromStatus/toStatus/reasonCode/reason/operatorType/operatorId/operatorName/occurredAt；EVIDENCE 包含 evidenceNo/evidenceStatus/receiptNo/transactionHash/occurredAt
+      parameters: [ { name: ipId, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
   /ips/{ipId}/submit:
     post:
       tags: [IP与方案]
